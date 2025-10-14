@@ -5,6 +5,7 @@ import { ThemeToggle } from './components/ThemeToggle'
 import { Music } from 'lucide-react'
 import CustomVideoSlider from "./components/ui/CustomVideoSlider";
 import VideoList from "./components/ui/VideoList";
+import VideoListSoundDesign from "./components/ui/VideoListSoundDesign";
 import './App.css'
 
 const translations = {
@@ -221,37 +222,7 @@ function App() {
             transition={pageTransition}
           >
             <h2 className="section-title text-marinho dark:text-marinho border-b-2 border-marinho mb-4 pb-2">{t.sounddesign}</h2>
-            <div className="sounddesign-slider" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: 1000, margin: '0 auto', marginBottom: 32 }}>
-              <div style={{
-                background: 'var(--color-bg-glass)',
-                border: '1.5px solid var(--color-border)',
-                color: 'var(--color-primary)',
-                width: '100%',
-                maxWidth: 900,
-                borderRadius: 18,
-                boxShadow: '0 4px 24px 0 rgba(0,0,0,0.13)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                padding: 32
-              }}>
-                <div style={{ fontWeight: 700, fontSize: 24, color: '#fff', marginBottom: 18, textAlign: 'center', textShadow: '0 2px 8px #0007', width: '100%' }}>
-                  {t.demoreel.title}
-                </div>
-                <iframe
-                  width="800"
-                  height="450"
-                  src="https://www.youtube.com/embed/HzZW1iWsiIY"
-                  title="Demoreel - Resound of game trailers"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  style={{ display: 'block', margin: '0 auto', borderRadius: 18, boxShadow: '0 4px 24px 0 rgba(0,0,0,0.13)', background: 'black', maxWidth: '100%' }}
-                ></iframe>
-                <div style={{ color: 'var(--color-primary)', fontWeight: 'bold', textAlign: 'center', marginTop: 18, maxWidth: 700 }}>
-                  {t.demoreel.desc}
-                </div>
-              </div>
-            </div>
+            <VideoListSoundDesign language={language} />
           </motion.div>
         )
       case 'soundtracks':
