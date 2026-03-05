@@ -9,9 +9,9 @@ import "swiper/css/pagination";
 const videos = {
     pt: [
         {
-            src: "https://www.youtube.com/embed/HzZW1iWsiIY",
-            title: "Demoreel - Resound de trailers de jogos",
-            desc: "Um rápido demoreel de alguns sound designs para trailers de jogos. Todo som dos vídeos originais foi retirado e produzido novamente do zero por mim, desde as músicas até os SFX."
+            src: "https://www.youtube.com/watch?v=Ybjn8PF6HEseo",
+            title: "Omaggio à 1917 – Verformung du temps istoricheskogo",
+            desc: "Uma peça eletroacustica que procura a esperança"
         },
         {
             src: "https://www.youtube.com/embed/I8wN5srxeBc",

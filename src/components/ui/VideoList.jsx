@@ -2,6 +2,15 @@ import React, { useEffect, useState } from "react";
 
 const videoData = [
     {
+        url: "https://www.youtube.com/watch?v=Ybjn8PF6HEseo",
+        color: "#fff",
+        resumo: {
+            pt: "Nova peça adicionada ao portfólio.",
+            en: "New piece added to the portfolio.",
+            es: "Nueva pieza añadida al portafolio."
+        }
+    },
+    {
         url: "https://youtu.be/YC8eJ43UKVM?si=a5DueeoLw40qOnn1",
         color: "#fff",
         resumo: {
@@ -21,7 +30,7 @@ const videoData = [
     },
     {
         url: "https://www.youtube.com/watch?v=S2L27sPpZnU",
-        color: "#5f5f5fff",
+        color: "rgb(255, 255, 255)",
         resumo: {
             pt: "Reflexão sobre a loucura e a mimese da realidade. Mistura referências históricas, mitológicas e filosóficas em uma música de contrastes e metáforas.",
             en: "Reflection on madness and the mimesis of reality. Mixes historical, mythological, and philosophical references in a music of contrasts and metaphors.",
@@ -30,7 +39,7 @@ const videoData = [
     },
     {
         url: "https://youtu.be/j558qSBRE3Q?si=qeg0HhyhbtuLKjbk",
-        color: "#5f5f5fff",
+        color: "rgb(255, 255, 255)",
         resumo: {
             pt: "Peça eletroacústica para quadrifonia, explora espacialização e saturação como elemento musical. Reflexo da experiência paulistana do compositor.",
             en: "Electroacoustic piece for quadraphony, explores spatialization and saturation as musical elements. A reflection of the composer's São Paulo experience.",
