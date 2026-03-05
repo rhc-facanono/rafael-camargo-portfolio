@@ -6,6 +6,7 @@ import { Music } from 'lucide-react'
 import CustomVideoSlider from "./components/ui/CustomVideoSlider";
 import VideoList from "./components/ui/VideoList";
 import VideoListSoundDesign from "./components/ui/VideoListSoundDesign";
+import HarmonicNetwork from "./components/ui/HarmonicNetwork";
 import './App.css'
 
 const translations = {
@@ -15,6 +16,7 @@ const translations = {
       'ELECTROACOUSTIC & INSTRUMENTAL',
       'SOUND DESIGN',
       'SOUNDTRACKS',
+      'CODES',
       'ABOUT',
       'CONTACT',
     ],
@@ -58,6 +60,7 @@ const translations = {
       'ELETROACÚSTICA & INSTRUMENTAL',
       'SOUND DESIGN',
       'SOUNDTRACKS',
+      'CÓDIGOS',
       'SOBRE',
       'CONTATO',
     ],
@@ -101,6 +104,7 @@ const translations = {
       'ELECTROACÚSTICA & INSTRUMENTAL',
       'SOUND DESIGN',
       'SOUNDTRACKS',
+      'CÓDIGOS',
       'SOBRE',
       'CONTACTO',
     ],
