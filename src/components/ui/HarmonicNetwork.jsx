@@ -4,6 +4,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 
 const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
 function midiToNote(midi) {
     const name = noteNames[midi % 12];
     const oct = Math.floor(midi / 12) - 1;
@@ -11,7 +12,7 @@ function midiToNote(midi) {
 }
 
 // Component to render individual note point with texture
-function NotePoint({ pt, selectedSet, toggleSelect, blendedHue, saturation, luminance, isSel, ignoreNextRef }) {
+function NotePoint({ pt, selectedSet, toggleSelect, blendedHue, saturation, luminance, isSel, ignoreNextRef, customOpacity }) {
     // Cores levemente mais claras e brilhantes
     const baseSat = isSel ? 90 : 65;
     const baseLum = isSel ? 90 : 55;
@@ -31,7 +32,7 @@ function NotePoint({ pt, selectedSet, toggleSelect, blendedHue, saturation, lumi
             <meshStandardMaterial
                 color={color}
                 transparent={true}
-                opacity={0.55}
+                opacity={customOpacity}
                 roughness={0.12}
                 metalness={0.25}
                 emissive={isSel ? '#fff' : color}
@@ -61,6 +62,8 @@ function HarmonicNetwork() {
     const [intZ, setIntZ] = useState(4);
     const [selectedSet, setSelectedSet] = useState(new Set());
     const ignoreNextRef = useRef(false); // flag to prevent camera move after Ctrl+click
+    const [showOnlyHighlight, setShowOnlyHighlight] = useState(false);
+
     // Memoize points so array is only recalculated when relevant state changes
     const points = React.useMemo(() => {
         const arr = [];
@@ -90,7 +93,7 @@ function HarmonicNetwork() {
     };
 
     // Pan control with Alt+drag
-    const PanControls = ({ ignoreNextRef }) => {
+    const PanControls = React.forwardRef(({ ignoreNextRef }, ref) => {
         const { camera } = useThree();
         const controlsRef = useRef();
         const [isPanning, setIsPanning] = useState(false);
@@ -143,11 +146,12 @@ function HarmonicNetwork() {
                 onPointerDown={handleMouseDown}
             />
         );
-    };
+    });
 
     // PanControls only mounted once, never re-created
     const panControlsRef = useRef();
     const PanControlsSingleton = React.useMemo(() => <PanControls ignoreNextRef={ignoreNextRef} ref={panControlsRef} />, []);
+
     return (
         <div className="w-full h-full relative overflow-hidden">
             <div className="absolute top-4 left-4 bg-black bg-opacity-70 p-4 rounded z-50">
@@ -184,6 +188,12 @@ function HarmonicNetwork() {
                         <input className="ml-1 w-12 bg-gray-800 text-white text-sm p-1 rounded" type="number" value={intZ} onChange={e => setIntZ(Number(e.target.value))} />
                     </label>
                 </div>
+                <div className="flex items-center mt-2">
+                    <label className="text-white text-sm flex items-center">
+                        <input type="checkbox" className="mr-2" checked={showOnlyHighlight} onChange={e => setShowOnlyHighlight(e.target.checked)} />
+                        Mostrar apenas esferas destacadas
+                    </label>
+                </div>
             </div>
             <Canvas camera={{ position: [10, 10, 20], fov: 75 }}>
                 <ambientLight />
@@ -200,6 +210,8 @@ function HarmonicNetwork() {
                     const saturation = isSel ? '80%' : '55%';
                     const luminance = isSel ? '80%' : '45%';
 
+                    const customOpacity = showOnlyHighlight ? (isSel ? 0.55 : 0.08) : 0.55;
+
                     return (
                         <NotePoint
                             key={idx}
@@ -211,10 +223,11 @@ function HarmonicNetwork() {
                             luminance={luminance}
                             isSel={isSel}
                             ignoreNextRef={ignoreNextRef}
+                            customOpacity={customOpacity}
                         />
                     );
                 })}
-                n            </Canvas>
+            </Canvas>
         </div>
     );
 }
