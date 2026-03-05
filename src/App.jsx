@@ -6,6 +6,8 @@ import { Music } from 'lucide-react'
 import CustomVideoSlider from "./components/ui/CustomVideoSlider";
 import VideoList from "./components/ui/VideoList";
 import VideoListSoundDesign from "./components/ui/VideoListSoundDesign";
+import HarmonicNetwork from "./components/ui/HarmonicNetwork";
+import CodeList from "./components/ui/CodeList";
 import './App.css'
 
 const translations = {
@@ -14,6 +16,7 @@ const translations = {
       'HOME',
       'ELECTROACOUSTIC & INSTRUMENTAL',
       'SOUND DESIGN',
+      'CODES',
       'SOUNDTRACKS',
       'ABOUT',
       'CONTACT',
@@ -57,6 +60,7 @@ const translations = {
       'HOME',
       'ELETROACÚSTICA & INSTRUMENTAL',
       'SOUND DESIGN',
+      'CÓDIGOS',
       'SOUNDTRACKS',
       'SOBRE',
       'CONTATO',
@@ -100,6 +104,7 @@ const translations = {
       'HOME',
       'ELECTROACÚSTICA & INSTRUMENTAL',
       'SOUND DESIGN',
+      'CÓDIGOS',
       'SOUNDTRACKS',
       'SOBRE',
       'CONTACTO',
@@ -148,6 +153,8 @@ function App() {
     { id: 'home', label: 'HOME' },
     { id: 'electroacoustic', label: 'ELETROACÚSTICA & INSTRUMENTAL' },
     { id: 'sounddesign', label: 'SOUND DESIGN' },
+    { id: 'codes', label: 'CÓDIGOS' },
+    { id: 'harmonicnet', label: 'REDE HARMÔNICA' },
     { id: 'soundtracks', label: 'SOUNDTRACKS' },
     { id: 'about', label: 'ABOUT' },
     { id: 'contact', label: 'CONTACT' }
@@ -223,6 +230,36 @@ function App() {
           >
             <h2 className="section-title text-marinho dark:text-marinho border-b-2 border-marinho mb-4 pb-2">{t.sounddesign}</h2>
             <VideoListSoundDesign language={language} />
+          </motion.div>
+        )
+      case 'codes':
+        return (
+          <motion.div
+            className="project-content"
+            key="codes"
+            initial="initial"
+            animate="in"
+            exit="out"
+            variants={pageVariants}
+            transition={pageTransition}
+          >
+            <h2 className="section-title text-marinho dark:text-marinho border-b-2 border-marinho mb-4 pb-2">Códigos</h2>
+            <CodeList language={language} />
+          </motion.div>
+        )
+      case 'harmonicnet':
+        return (
+          <motion.div
+            className="harmonic-network-content"
+            key="harmonicnet"
+            initial="initial"
+            animate="in"
+            exit="out"
+            variants={pageVariants}
+            transition={pageTransition}
+          >
+            <h2 className="section-title text-marinho dark:text-marinho border-b-2 border-marinho mb-4 pb-2">Rede Harmônica 3D</h2>
+            <HarmonicNetwork />
           </motion.div>
         )
       case 'soundtracks':
