@@ -5,10 +5,25 @@ import { OrbitControls, Text, Billboard } from "@react-three/drei";
 
 const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
+// ==========================================
+// FUNÇÕES MATEMÁTICAS E DE FORMATAÇÃO
+// ==========================================
+
 function midiToNote(midi) {
     const name = noteNames[((Math.round(midi) % 12) + 12) % 12];
     const oct = Math.floor(Math.round(midi) / 12) - 1;
     return name + oct;
+}
+
+function hzToNoteAndCents(hz) {
+    if (!hz || hz <= 0) return "";
+    const midiFloat = 69 + 12 * Math.log2(hz / 440);
+    const midiInt = Math.round(midiFloat);
+    let cents = Math.round((midiFloat - midiInt) * 100);
+    const name = noteNames[((midiInt % 12) + 12) % 12];
+    const oct = Math.floor(midiInt / 12) - 1;
+    const sign = cents >= 0 ? '+' : '';
+    return `${name}${oct} ${cents !== 0 ? sign + cents + 'c' : ''}`;
 }
 
 function midiToQuarterTone(midi) {
@@ -28,23 +43,49 @@ function midiArrayToQuarterTones(arr) {
     return arr.map(midiToQuarterTone).join(', ');
 }
 
-function parseMidiString(str) {
-    return str.replace(/[^0-9\.,\s-]/g, '')
-        .split(/[\s,]+/)
-        .filter(s => s !== '')
-        .map(Number)
-        .filter(n => !isNaN(n));
+function parseAdvancedToHz(str) {
+    const parts = str.split(/[,;\s]+/).filter(Boolean);
+    return parts.map(p => {
+        if (p.toLowerCase().endsWith('hz')) return parseFloat(p);
+        let centsOffset = 0;
+        let mainPart = p;
+        const cMatch = p.match(/([+-]\d+)c$/i);
+        if (cMatch) {
+            centsOffset = parseInt(cMatch[1]);
+            mainPart = p.replace(cMatch[0], '');
+        }
+        const noteMatch = mainPart.match(/^([A-G][#b]?)([\+])?(-?\d+)$/i);
+        if (noteMatch) {
+            const name = noteMatch[1].toUpperCase();
+            const isQuarter = noteMatch[2] === '+';
+            const oct = parseInt(noteMatch[3]);
+            const nameMap = { "C": 0, "C#": 1, "DB": 1, "D": 2, "D#": 3, "EB": 3, "E": 4, "F": 5, "F#": 6, "GB": 6, "G": 7, "G#": 8, "AB": 8, "A": 9, "A#": 10, "BB": 10, "B": 11 };
+            let midi = nameMap[name] + (oct + 1) * 12;
+            if (isQuarter) midi += 0.5;
+            midi += centsOffset / 100;
+            return 440 * Math.pow(2, (midi - 69) / 12);
+        }
+        const m = parseFloat(mainPart);
+        if (!isNaN(m)) return 440 * Math.pow(2, (m - 69) / 12);
+        return null;
+    }).filter(n => n !== null);
 }
 
-// Modos de Messiaen (C=0)
+function hzToMidi(hz) { return 69 + 12 * Math.log2(hz / 440); }
+function midiToHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
 const messiaenModes = {
-    1: [0, 2, 4, 6, 8, 10], // Tons inteiros
-    2: [0, 1, 3, 4, 6, 7, 9, 10], // Octatônica
-    3: [0, 2, 3, 4, 6, 7, 8, 10, 11]
+    1: { name: "Modo 1 (2-2-2-2-2-2)", pcs: [0, 2, 4, 6, 8, 10] },
+    2: { name: "Modo 2 (1-2-1-2-1-2-1-2)", pcs: [0, 1, 3, 4, 6, 7, 9, 10] },
+    3: { name: "Modo 3 (2-1-1-2-1-1-2-1-1)", pcs: [0, 2, 3, 4, 6, 7, 8, 10, 11] },
+    4: { name: "Modo 4 (1-1-3-1-1-1-3-1)", pcs: [0, 1, 2, 5, 6, 7, 8, 11] },
+    5: { name: "Modo 5 (1-4-1-1-4-1)", pcs: [0, 1, 5, 6, 7, 11] },
+    6: { name: "Modo 6 (2-2-1-1-2-2-1-1)", pcs: [0, 2, 4, 5, 6, 8, 10, 11] },
+    7: { name: "Modo 7 (1-1-1-2-1-1-1-1-2-1-1-1)", pcs: [0, 1, 2, 3, 5, 6, 7, 8, 9, 11] },
 };
 
 function snapToMode(midiArr, modeKey) {
-    const mode = messiaenModes[modeKey];
+    const mode = messiaenModes[modeKey].pcs;
     return midiArr.map(midi => {
         let pc = ((Math.round(midi) % 12) + 12) % 12;
         let closest = mode[0];
@@ -61,27 +102,42 @@ function snapToMode(midiArr, modeKey) {
     });
 }
 
+const playAudio = (hzArray, isSimultaneous = false) => {
+    if (!hzArray || hzArray.length === 0) return;
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const t = ctx.currentTime;
+    hzArray.forEach((hz, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = hz;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        const start = t + (isSimultaneous ? 0 : i * 0.35);
+        const dur = isSimultaneous ? 2.5 : 0.4;
+        osc.start(start);
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.15, start + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+        osc.stop(start + dur);
+    });
+};
+
 // ==========================================
 // 3D & COMPONENTES VISUAIS
 // ==========================================
 
 function GridLines({ showOnlyHighlight, selectedSet }) {
     const { normal, high } = useMemo(() => {
-        const normalPts = [];
-        const highPts = [];
+        const normalPts = [], highPts = [];
         for (let x = -7; x <= 7; x++) {
             for (let y = -2; y <= 2; y++) {
                 for (let z = -2; z <= 2; z++) {
-                    const currentKey = `${x},${y},${z}`;
-                    const isCurrentSel = selectedSet.has(currentKey);
-
+                    const isCurSel = selectedSet.has(`${x},${y},${z}`);
                     const addLine = (nx, ny, nz) => {
-                        const neighborKey = `${nx},${ny},${nz}`;
-                        const isNeighborSel = selectedSet.has(neighborKey);
-                        if (isCurrentSel && isNeighborSel) highPts.push(x * 1.5, y * 2, z * 2.5, nx * 1.5, ny * 2, nz * 2.5);
+                        const isNeighSel = selectedSet.has(`${nx},${ny},${nz}`);
+                        if (isCurSel && isNeighSel) highPts.push(x * 1.5, y * 2, z * 2.5, nx * 1.5, ny * 2, nz * 2.5);
                         else normalPts.push(x * 1.5, y * 2, z * 2.5, nx * 1.5, ny * 2, nz * 2.5);
                     };
-
                     if (x < 7) addLine(x + 1, y, z);
                     if (y < 2) addLine(x, y + 1, z);
                     if (z < 2) addLine(x, y, z + 1);
@@ -108,43 +164,21 @@ function GridLines({ showOnlyHighlight, selectedSet }) {
 }
 
 function NotePoint({ pt, selectedSet, toggleSelect, blendedHue, isSel, ignoreNextRef, customOpacity, textOpacity }) {
-    const baseSat = isSel ? 90 : 65;
-    const baseLum = isSel ? 90 : 55;
-    const color = new THREE.Color(`hsl(${blendedHue},${baseSat}%,${baseLum}%)`);
+    const color = new THREE.Color(`hsl(${blendedHue},${isSel ? 90 : 65}%,${isSel ? 90 : 55}%)`);
     return (
         <mesh position={pt.position} onClick={e => { if (e.ctrlKey) { e.stopPropagation(); ignoreNextRef.current = true; toggleSelect(pt.coord); } }}>
             <sphereGeometry args={[0.2, 32, 32]} />
-            <meshStandardMaterial color={color} transparent={true} opacity={customOpacity} roughness={0.12} metalness={0.25} emissive={isSel ? '#fff' : color} emissiveIntensity={isSel ? 0.35 : 0.05} />
+            <meshStandardMaterial color={color} transparent opacity={customOpacity} roughness={0.12} metalness={0.25} emissive={isSel ? '#fff' : color} emissiveIntensity={isSel ? 0.35 : 0.05} />
             <Billboard>
-                <Text position={[0, 0, 0]} fontSize={0.23} color="#ffffff" outlineWidth={0.05} outlineColor="#000000" anchorX="center" anchorY="middle" fontWeight="bold" depthOffset={-1} fillOpacity={textOpacity} outlineOpacity={textOpacity}>
-                    {pt.note}
-                </Text>
+                <Text position={[0, 0, 0]} fontSize={0.23} color="#ffffff" outlineWidth={0.05} outlineColor="#000000" anchorX="center" anchorY="middle" fontWeight="bold" depthOffset={-1} fillOpacity={textOpacity} outlineOpacity={textOpacity}>{pt.note}</Text>
             </Billboard>
         </mesh>
     );
 }
 
 function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, onKeyClick = null, onNoteDrag = null, onNoteDelete = null, originalEntityLength = 0 }) {
-    const minMidi = 36, maxMidi = 96, rowHeight = 14, keyWidth = 60;
-    const totalHeight = (maxMidi - minMidi + 1) * rowHeight;
+    const minMidi = 36, maxMidi = 96, rowHeight = 14, keyWidth = 60, totalHeight = (maxMidi - minMidi + 1) * rowHeight;
     const [draggingIdx, setDraggingIdx] = useState(null);
-
-    const renderKeys = () => {
-        const keys = [];
-        for (let m = maxMidi; m >= minMidi; m--) {
-            const isBlack = [1, 3, 6, 8, 10].includes(m % 12);
-            const y = (maxMidi - m) * rowHeight;
-            const isC = (m % 12 === 0);
-            keys.push(
-                <g key={`key-${m}`} onClick={() => onKeyClick && onKeyClick(m)} style={{ cursor: onKeyClick ? 'pointer' : 'default' }}>
-                    <rect x={0} y={y} width={keyWidth} height={rowHeight} fill={isBlack ? "#222" : "#eee"} stroke="#999" strokeWidth="1" />
-                    {isC && <text x={5} y={y + 10} fontSize="9" fill={isBlack ? "#fff" : "#000"} fontWeight="bold">C{(m / 12) - 1}</text>}
-                    {onKeyClick && <rect x={0} y={y} width={keyWidth} height={rowHeight} fill="white" opacity="0" className="hover:opacity-20 transition-opacity" />}
-                </g>
-            );
-        }
-        return keys;
-    };
 
     const handlePointerDown = (e, idx) => {
         if (e.ctrlKey) { e.stopPropagation(); if (onNoteDelete) onNoteDelete(idx); return; }
@@ -152,15 +186,12 @@ function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, o
             e.stopPropagation(); e.target.setPointerCapture(e.pointerId); setDraggingIdx(idx);
         }
     };
-
     const handlePointerMove = (e) => {
         if (draggingIdx === null || !onNoteDrag) return;
-        const svgRect = e.currentTarget.getBoundingClientRect();
-        let newMidi = maxMidi - Math.round((e.clientY - svgRect.top) / rowHeight);
+        let newMidi = maxMidi - Math.round((e.clientY - e.currentTarget.getBoundingClientRect().top) / rowHeight);
         newMidi = Math.max(minMidi, Math.min(maxMidi, newMidi));
         if (notes[draggingIdx] !== newMidi) onNoteDrag(draggingIdx, newMidi);
     };
-
     const handlePointerUp = (e) => { if (draggingIdx !== null) { e.target.releasePointerCapture(e.pointerId); setDraggingIdx(null); } };
 
     return (
@@ -171,22 +202,26 @@ function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, o
                     return <line key={`grid-${m}`} x1={keyWidth} y1={y} x2="100%" y2={y} stroke={isBlack ? "#333" : "#444"} strokeWidth="1" opacity="0.5" />;
                 })}
                 {notes.map((midi, idx) => {
-                    const y = (maxMidi - midi) * rowHeight;
-                    const x = isSequence ? keyWidth + 10 + (idx * 30) : keyWidth + 20;
-                    const width = isSequence ? 25 : 80;
-                    let color = "#1e90ff";
-                    if (isMicrotonal) color = "#ff4757";
-                    else if (originalEntityLength > 0 && idx >= originalEntityLength) color = "#9b59b6";
-                    const isDraggable = onNoteDrag && (!originalEntityLength || idx < originalEntityLength) && !isMicrotonal;
-
+                    const y = (maxMidi - midi) * rowHeight, x = isSequence ? keyWidth + 10 + (idx * 30) : keyWidth + 20;
+                    let color = isMicrotonal ? "#ff4757" : (originalEntityLength > 0 && idx >= originalEntityLength) ? "#9b59b6" : "#1e90ff";
                     return (
                         <g key={`note-${idx}`}>
-                            <rect x={x} y={y} width={width} height={rowHeight - 2} fill={color} rx="3" opacity="0.9" style={{ cursor: isDraggable ? 'ns-resize' : (onNoteDelete ? 'pointer' : 'default') }} onPointerDown={(e) => handlePointerDown(e, idx)} />
-                            {isMicrotonal && <text x={x + 2} y={y + 9} fontSize="7" fill="#fff" fontWeight="bold">{midi.toFixed(2)}</text>}
+                            <rect x={x} y={y} width={isSequence ? 25 : 80} height={rowHeight - 2} fill={color} rx="3" opacity="0.9" style={{ cursor: (onNoteDrag && !isMicrotonal) ? 'ns-resize' : 'default' }} onPointerDown={(e) => handlePointerDown(e, idx)} />
                         </g>
                     );
                 })}
-                <g className="sticky left-0 drop-shadow-lg">{renderKeys()}</g>
+                <g className="sticky left-0 drop-shadow-lg">
+                    {Array.from({ length: maxMidi - minMidi + 1 }).map((_, i) => {
+                        let m = maxMidi - i, y = i * rowHeight, isBlack = [1, 3, 6, 8, 10].includes(m % 12), isC = (m % 12 === 0);
+                        return (
+                            <g key={`key-${m}`} onClick={() => onKeyClick && onKeyClick(m)} style={{ cursor: onKeyClick ? 'pointer' : 'default' }}>
+                                <rect x={0} y={y} width={keyWidth} height={rowHeight} fill={isBlack ? "#222" : "#eee"} stroke="#999" strokeWidth="1" />
+                                {isC && <text x={5} y={y + 10} fontSize="9" fill={isBlack ? "#fff" : "#000"} fontWeight="bold">C{(m / 12) - 1}</text>}
+                                {onKeyClick && <rect x={0} y={y} width={keyWidth} height={rowHeight} fill="white" opacity="0" className="hover:opacity-20" />}
+                            </g>
+                        );
+                    })}
+                </g>
             </svg>
         </div>
     );
@@ -201,39 +236,49 @@ function HarmonicNetwork() {
 
     // ABA 1
     const [baseNote, setBaseNote] = useState(48);
-    const [intX, setIntX] = useState(7);
-    const [intY, setIntY] = useState(12);
-    const [intZ, setIntZ] = useState(4);
+    const [intX, setIntX] = useState(7), [intY, setIntY] = useState(12), [intZ, setIntZ] = useState(4);
     const [selectedSet, setSelectedSet] = useState(new Set());
     const [showOnlyHighlight, setShowOnlyHighlight] = useState(false);
     const [filterText, setFilterText] = useState("");
     const [showHelp, setShowHelp] = useState(false);
 
     // ABA 2
-    const [tab2InputA, setTab2InputA] = useState("");
-    const [tab2InputB, setTab2InputB] = useState("0, 4, 7");
+    const [tab2InputA, setTab2InputA] = useState(""), [tab2InputB, setTab2InputB] = useState("0, 4, 7");
+    const [tab2NonTemp, setTab2NonTemp] = useState(false);
 
     // ABA 3
     const [tab3Input, setTab3Input] = useState("");
 
     // ABA 4
     const [tab4Input, setTab4Input] = useState("");
-    const [targetMinHz, setTargetMinHz] = useState(440);
-    const [targetMaxHz, setTargetMaxHz] = useState(880);
+    const [targetMinHz, setTargetMinHz] = useState(440), [targetMaxHz, setTargetMaxHz] = useState(880);
 
     // ABA 5 (Messiaen Permutations)
-    const [tab5Input, setTab5Input] = useState("");
-    const [tab5Perm, setTab5Perm] = useState("2, 3, 4, 1");
-    const [tab5ViewMode, setTab5ViewMode] = useState("notes"); // 'notes', 'indices', 'pcs'
+    const [tab5Input, setTab5Input] = useState(""), [tab5Perm, setTab5Perm] = useState("2, 3, 4, 1");
+    const [tab5ViewMode, setTab5ViewMode] = useState("notes");
 
     // ABA 6 (12-Tone Matrix)
     const [tab6Input, setTab6Input] = useState("0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11");
+    const [tab6Gt12, setTab6Gt12] = useState(false);
+    const [tab6View, setTab6View] = useState("pc");
+
+    // ABA 7 (Ring Mod)
+    const [tab7Input, setTab7Input] = useState("");
+    const [tab7Limit, setTab7Limit] = useState(20);
+
+    // ABA 8 (FM)
+    const [tab8Carrier, setTab8Carrier] = useState("440Hz"), [tab8Modulator, setTab8Modulator] = useState("100Hz");
+    const [tab8K, setTab8K] = useState(5);
+
+    // ABA 9 (Additive)
+    const [tab9Input, setTab9Input] = useState("");
+    const [tab9Harmonics, setTab9Harmonics] = useState(4), [tab9Sub, setTab9Sub] = useState(1);
 
     const ignoreNextRef = useRef(false);
     const panControlsRef = useRef();
 
     // ==========================================
-    // MOTORES DE CÁLCULO (MEMOIZED)
+    // LÓGICAS E MOTORES (MEMOIZED)
     // ==========================================
 
     const points = useMemo(() => {
@@ -241,8 +286,7 @@ function HarmonicNetwork() {
         for (let x = -7; x <= 7; x++) {
             for (let y = -2; y <= 2; y++) {
                 for (let z = -2; z <= 2; z++) {
-                    const midi = baseNote + x * intX + y * intY + z * intZ;
-                    arr.push({ coord: [x, y, z], position: [x * 1.5, y * 2, z * 2.5], note: midiToNote(midi), midi: midi });
+                    arr.push({ coord: [x, y, z], position: [x * 1.5, y * 2, z * 2.5], note: midiToNote(baseNote + x * intX + y * intY + z * intZ), midi: baseNote + x * intX + y * intY + z * intZ });
                 }
             }
         }
@@ -251,16 +295,22 @@ function HarmonicNetwork() {
 
     const tab1MidiNotes = useMemo(() => points.filter(pt => selectedSet.has(pt.coord.join(','))).map(pt => pt.midi).sort((a, b) => a - b), [points, selectedSet]);
 
-    const tab2Result = useMemo(() => {
-        let arrA = parseMidiString(tab2InputA), arrB = parseMidiString(tab2InputB);
-        if (!arrA.length || !arrB.length) return [];
-        let result = new Set(), baseB = arrB[0];
-        arrB.forEach(b => { let diff = b - baseB; arrA.forEach(a => result.add(a + diff)); });
+    const tab2ResultHz = useMemo(() => {
+        let hzA = parseAdvancedToHz(tab2InputA), hzB = parseAdvancedToHz(tab2InputB);
+        if (!hzA.length || !hzB.length) return [];
+        let result = new Set();
+        if (tab2NonTemp) {
+            let baseB = hzB[0];
+            hzB.forEach(b => { let ratio = b / baseB; hzA.forEach(a => result.add(a * ratio)); });
+        } else {
+            let baseB = hzToMidi(hzB[0]);
+            hzB.forEach(b => { let diff = hzToMidi(b) - baseB; hzA.forEach(a => result.add(midiToHz(hzToMidi(a) + diff))); });
+        }
         return Array.from(result).sort((a, b) => a - b);
-    }, [tab2InputA, tab2InputB]);
+    }, [tab2InputA, tab2InputB, tab2NonTemp]);
 
     const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
-    const tab3ParsedInput = parseMidiString(tab3Input);
+    const tab3ParsedInput = parseAdvancedToHz(tab3Input).map(hzToMidi);
     const tab3Result = useMemo(() => {
         let arr = [...tab3ParsedInput];
         if (arr.length < 2) return arr;
@@ -277,18 +327,17 @@ function HarmonicNetwork() {
     }, [tab3ParsedInput]);
 
     const handleNormalizeFreqs = () => {
-        let arr = parseMidiString(tab4Input);
+        let arr = parseAdvancedToHz(tab4Input);
         if (arr.length > 0) {
-            let hzArr = arr.map(m => 440 * Math.pow(2, (m - 69) / 12));
+            let hzArr = arr.map(m => 440 * Math.pow(2, (hzToMidi(m) - 69) / 12));
             setTargetMinHz(Math.min(...hzArr).toFixed(2));
             setTargetMaxHz(Math.max(...hzArr).toFixed(2));
         }
     };
 
-    const tab4Result = useMemo(() => {
-        let arr = parseMidiString(tab4Input);
-        if (arr.length < 2) return [];
-        let hzArr = arr.map(m => 440 * Math.pow(2, (m - 69) / 12));
+    const tab4ResultHz = useMemo(() => {
+        let hzArr = parseAdvancedToHz(tab4Input);
+        if (hzArr.length < 2) return [];
         let minHz = Math.min(...hzArr), maxHz = Math.max(...hzArr);
         if (minHz === maxHz) return hzArr;
         return hzArr.map(f => {
@@ -297,63 +346,95 @@ function HarmonicNetwork() {
         });
     }, [tab4Input, targetMinHz, targetMaxHz]);
 
-    const tab4MidiEquivalents = useMemo(() => tab4Result.map(hz => 69 + 12 * Math.log2(hz / 440)), [tab4Result]);
+    const tab4MidiEquivalents = useMemo(() => tab4ResultHz.map(hz => 69 + 12 * Math.log2(hz / 440)), [tab4ResultHz]);
 
-    // ABA 5: Permutações Simétricas
     const tab5Result = useMemo(() => {
-        let base = parseMidiString(tab5Input);
+        let base = parseAdvancedToHz(tab5Input).map(hzToMidi);
         if (base.length < 2) return [base];
-        let perm = parseMidiString(tab5Perm); // Índices começando em 1
-        if (perm.length !== base.length) return [base]; // Evita erro se o vetor de perm n tiver o msm tamanho
+        let perm = parseAdvancedToHz(tab5Perm).map(hzToMidi);
+        if (perm.length !== base.length) return [base];
 
-        let results = [base];
-        let current = [...base];
-
-        // Loop de limite (Segurança)
+        let results = [base], current = [...base];
         for (let k = 0; k < 100; k++) {
             let next = new Array(base.length);
             for (let i = 0; i < perm.length; i++) {
-                let pIdx = perm[i] - 1; // Ajusta para array 0-based
+                let pIdx = perm[i] - 1;
                 next[i] = (pIdx >= 0 && pIdx < current.length) ? current[pIdx] : current[i];
             }
-            if (next.every((v, i) => v === base[i])) break; // Fechou o ciclo na identidade
             results.push(next);
+            if (next.every((v, i) => v === base[i])) break;
             current = next;
         }
         return results;
     }, [tab5Input, tab5Perm]);
 
     const formatTab5Output = (arr) => {
-        if (tab5ViewMode === 'pcs') return arr.map(n => ((n % 12) + 12) % 12).join(', ');
+        if (tab5ViewMode === 'pcs') return arr.map(n => ((Math.round(n) % 12) + 12) % 12).join(', ');
         if (tab5ViewMode === 'indices') {
-            let base = parseMidiString(tab5Input);
+            let base = parseAdvancedToHz(tab5Input).map(hzToMidi);
             return arr.map(n => base.indexOf(n) + 1).join(', ');
         }
         return midiArrayToNames(arr);
     };
 
-    // ABA 6: Matriz Dodecafônica
     const tab6Matrix = useMemo(() => {
-        let row = parseMidiString(tab6Input).map(n => ((n % 12) + 12) % 12);
-        // Remover duplicatas
-        row = Array.from(new Set(row));
-        if (row.length < 1) return [];
+        let row = parseAdvancedToHz(tab6Input).map(hzToMidi);
+        if (!tab6Gt12) row = Array.from(new Set(row.map(n => ((Math.round(n) % 12) + 12) % 12)));
+        if (row.length < 1) return { m: [], row: [], inv: [] };
 
         let p0 = row[0];
-        let inv = row.map(val => (p0 - (val - p0) + 24) % 12);
+        let inv = row.map(val => tab6Gt12 ? p0 - (val - p0) : (p0 - (val - p0) + 24) % 12);
         let matrix = [];
         for (let r = 0; r < row.length; r++) {
             let mRow = [];
             for (let c = 0; c < row.length; c++) {
-                mRow.push((row[c] + inv[r] - p0 + 24) % 12);
+                mRow.push(tab6Gt12 ? (row[c] + inv[r] - p0) : (row[c] + inv[r] - p0 + 24) % 12);
             }
             matrix.push(mRow);
         }
-        return matrix;
-    }, [tab6Input]);
+        return { m: matrix, row, inv };
+    }, [tab6Input, tab6Gt12]);
+
+    const tab7ResultHz = useMemo(() => {
+        let hzArr = parseAdvancedToHz(tab7Input);
+        let res = new Set();
+        for (let i = 0; i < hzArr.length; i++) {
+            for (let j = i + 1; j < hzArr.length; j++) {
+                res.add(hzArr[i] + hzArr[j]);
+                res.add(Math.abs(hzArr[i] - hzArr[j]));
+            }
+        }
+        return Array.from(res).sort((a, b) => a - b).slice(0, tab7Limit);
+    }, [tab7Input, tab7Limit]);
+
+    const tab8ResultHz = useMemo(() => {
+        let C = parseAdvancedToHz(tab8Carrier)[0] || 440;
+        let M = parseAdvancedToHz(tab8Modulator)[0] || 100;
+        let res = new Set([C]);
+        for (let i = 1; i <= tab8K; i++) {
+            res.add(C + i * M);
+            if (C - i * M > 0) res.add(C - i * M);
+            else res.add(Math.abs(C - i * M));
+        }
+        return Array.from(res).sort((a, b) => a - b);
+    }, [tab8Carrier, tab8Modulator, tab8K]);
+
+    const tab9ResultHz = useMemo(() => {
+        let hzArr = parseAdvancedToHz(tab9Input);
+        let res = new Set();
+        hzArr.forEach(f => {
+            for (let i = 1; i <= tab9Harmonics; i++) res.add(f * i);
+            for (let i = 1; i <= tab9Sub; i++) res.add(f / i);
+        });
+        return Array.from(res).sort((a, b) => a - b);
+    }, [tab9Input, tab9Harmonics, tab9Sub]);
 
 
-    // Interatividade UI
+    // ==========================================
+    // UI HANDLERS & CAMERAS
+    // ==========================================
+    const arrToStr = arr => arr.map(hzToMidi).join(', ');
+
     const handleTab3Drag = (idx, newMidi) => {
         let arr = [...tab3ParsedInput];
         if (idx < arr.length) { arr[idx] = newMidi; setTab3Input(arr.join(', ')); }
@@ -363,13 +444,24 @@ function HarmonicNetwork() {
         if (idx < arr.length) { arr.splice(idx, 1); setTab3Input(arr.join(', ')); }
     };
     const handleTab4Delete = (idx) => {
-        let arr = parseMidiString(tab4Input);
+        let arr = parseAdvancedToHz(tab4Input).map(hzToMidi);
         if (idx < arr.length) { arr.splice(idx, 1); setTab4Input(arr.join(', ')); }
     };
 
     const toggleSelect = (coord) => {
         const key = coord.join(',');
-        setSelectedSet(prev => { const copy = new Set(prev); if (copy.has(key)) copy.delete(key); else copy.add(key); return copy; });
+        setSelectedSet(prev => {
+            const copy = new Set(prev);
+            if (copy.has(key)) copy.delete(key);
+            else copy.add(key);
+            return copy;
+        });
+    };
+
+    const resetDefaults = () => {
+        setBaseNote(48); setIntX(7); setIntY(12); setIntZ(4);
+        setSelectedSet(new Set()); setFilterText(""); setShowOnlyHighlight(false);
+        panControlsRef.current?.resetCamera();
     };
 
     const applyFilter = () => {
@@ -422,23 +514,19 @@ function HarmonicNetwork() {
     return (
         <div className="w-full h-full relative flex flex-col bg-gray-950 font-sans text-white">
 
-            {/* NAVEGAÇÃO SUPERIOR */}
             <div className="flex flex-wrap bg-gray-900 border-b border-gray-700 p-2 gap-2 z-50 shadow-md flex-shrink-0">
-                <button onClick={() => setActiveTab(1)} className={`px-3 py-1.5 text-xs rounded transition ${activeTab === 1 ? 'bg-blue-600 font-bold shadow' : 'bg-gray-800 hover:bg-gray-700'}`}>1. Redes</button>
-                <button onClick={() => setActiveTab(2)} className={`px-3 py-1.5 text-xs rounded transition ${activeTab === 2 ? 'bg-blue-600 font-bold shadow' : 'bg-gray-800 hover:bg-gray-700'}`}>2. Multiplicação</button>
-                <button onClick={() => setActiveTab(3)} className={`px-3 py-1.5 text-xs rounded transition ${activeTab === 3 ? 'bg-blue-600 font-bold shadow' : 'bg-gray-800 hover:bg-gray-700'}`}>3. Módulos</button>
-                <button onClick={() => setActiveTab(4)} className={`px-3 py-1.5 text-xs rounded transition ${activeTab === 4 ? 'bg-blue-600 font-bold shadow' : 'bg-gray-800 hover:bg-gray-700'}`}>4. Projeções</button>
-                <button onClick={() => setActiveTab(5)} className={`px-3 py-1.5 text-xs rounded transition ${activeTab === 5 ? 'bg-purple-600 font-bold shadow' : 'bg-gray-800 hover:bg-gray-700'}`}>5. Permutações</button>
-                <button onClick={() => setActiveTab(6)} className={`px-3 py-1.5 text-xs rounded transition ${activeTab === 6 ? 'bg-red-700 font-bold shadow' : 'bg-gray-800 hover:bg-gray-700'}`}>6. Matriz Dodecafônica</button>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(t => (
+                    <button key={t} onClick={() => setActiveTab(t)} className={`px-2 py-1 text-[11px] rounded transition ${activeTab === t ? 'bg-blue-600 font-bold shadow' : 'bg-gray-800 hover:bg-gray-700'}`}>
+                        {["Redes", "Mult.", "Módulos", "Projeções", "Permutação", "Matriz", "Ring Mod", "FM", "Aditiva"][t - 1]}
+                    </button>
+                ))}
             </div>
 
-            {/* ÁREA DE CONTEÚDO */}
             <div className="flex-1 relative flex overflow-hidden">
 
-                {/* ABA 1: REDES */}
                 {activeTab === 1 && (
                     <>
-                        <div className="absolute top-4 left-4 bg-gray-900 bg-opacity-90 p-4 rounded-lg z-10 w-80 shadow-xl border border-gray-700 backdrop-blur-sm" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+                        <div className="absolute top-4 left-4 bg-gray-900 bg-opacity-90 p-4 rounded-lg z-10 w-80 shadow-xl border border-gray-700 backdrop-blur-sm flex flex-col max-h-[90%] pointer-events-auto">
                             <div className="overflow-y-auto custom-scrollbar pr-2 h-full flex flex-col space-y-4">
                                 <h3 className="text-sm font-bold text-blue-300 border-b border-gray-600 pb-2">Controles da Rede</h3>
                                 <button onClick={() => setShowHelp(!showHelp)} className="w-full bg-blue-700 hover:bg-blue-600 transition-colors text-xs font-semibold py-2 px-3 rounded">
@@ -463,197 +551,152 @@ function HarmonicNetwork() {
                                     </div>
                                 </div>
                                 <div className="pt-4 border-t border-gray-600">
-                                    <span className="text-xs text-gray-400 block mb-2">Filtrar Coordenadas (ex: 0,1,-1 a 3,1,-1):</span>
+                                    <span className="text-xs text-gray-400 block mb-2">Filtrar (ex: 0,1,-1 a 3,1,-1):</span>
                                     <div className="flex space-x-2">
-                                        <input type="text" className="flex-1 bg-gray-800 text-xs p-1.5 rounded border border-gray-600" value={filterText} onChange={e => setFilterText(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilter()} />
+                                        <input type="text" className="flex-1 bg-gray-800 text-xs p-1.5 rounded border border-gray-600" value={filterText} onChange={e => setFilterText(e.target.value)} />
                                         <button onClick={applyFilter} className="bg-green-600 hover:bg-green-500 text-xs py-1 px-3 rounded">Ok</button>
                                     </div>
                                 </div>
                                 <div className="pt-3 border-t border-gray-600">
                                     <label className="flex items-center text-xs cursor-pointer mb-3">
-                                        <input type="checkbox" className="mr-2" checked={showOnlyHighlight} onChange={e => setShowOnlyHighlight(e.target.checked)} />
-                                        Esconder não destacadas
+                                        <input type="checkbox" className="mr-2" checked={showOnlyHighlight} onChange={e => setShowOnlyHighlight(e.target.checked)} /> Esconder inativas
                                     </label>
                                     <div className="flex flex-col space-y-2">
-                                        <button onClick={() => panControlsRef.current?.resetCamera()} className="w-full bg-blue-900 hover:bg-blue-800 text-xs py-1.5 rounded">Centralizar Câmera</button>
-                                        <button onClick={() => { setBaseNote(48); setIntX(7); setIntY(12); setIntZ(4); setSelectedSet(new Set()); setFilterText(""); setShowOnlyHighlight(false); panControlsRef.current?.resetCamera(); }} className="w-full bg-red-900 hover:bg-red-800 text-xs py-1.5 rounded">Resetar Tudo</button>
+                                        <button onClick={() => panControlsRef.current?.resetCamera()} className="bg-blue-900 text-xs py-1.5 rounded">Centralizar Câmera</button>
+                                        <button onClick={resetDefaults} className="bg-red-900 text-xs py-1.5 rounded">Limpar Tudo</button>
                                     </div>
                                 </div>
                                 <div className="bg-gray-950 p-2 rounded border border-gray-700">
                                     <span className="text-[10px] text-green-400 block font-bold">Seleção [MIDI]:</span>
                                     <div className="text-[10px] font-mono break-all text-gray-300 mb-2">[{tab1MidiNotes.join(', ')}]</div>
-                                    <span className="text-[10px] text-blue-400 block font-bold border-t border-gray-800 pt-1">Seleção [Notas]:</span>
-                                    <div className="text-[10px] font-mono break-all text-gray-300">[{midiArrayToNames(tab1MidiNotes)}]</div>
+                                    <span className="text-[10px] text-blue-400 block font-bold">Seleção [Notas]:</span>
+                                    <div className="text-[10px] font-mono break-all text-gray-300 mb-2">[{midiArrayToNames(tab1MidiNotes)}]</div>
+                                    <button onClick={() => playAudio(tab1MidiNotes.map(midiToHz), true)} className="w-full bg-green-800 hover:bg-green-700 text-xs py-1 rounded">🎵 Ouvir (Acorde)</button>
                                 </div>
                             </div>
                         </div>
-
-                        <div className="w-full h-full absolute inset-0">
+                        <div className="w-full h-full absolute inset-0 z-0">
                             <Canvas camera={{ position: [0, 0, 2.2], fov: 60 }}>
                                 <ambientLight />
                                 {PanControlsSingleton}
                                 <GridLines showOnlyHighlight={showOnlyHighlight} selectedSet={selectedSet} />
                                 {points.map((pt, idx) => {
                                     const isSel = selectedSet.has(pt.coord.join(','));
-                                    const hueX = ((pt.coord[0] + 7) / 14) * 360;
-                                    const hueZ = ((pt.coord[2] + 2) / 4) * 120;
-                                    const blendedHue = (hueX * 0.75 + hueZ * 0.25) % 360;
-                                    const customOpacity = showOnlyHighlight ? (isSel ? 0.9 : 0.03) : 0.6;
-                                    const textOpacity = showOnlyHighlight ? (isSel ? 1 : 0.05) : 1;
-                                    return <NotePoint key={idx} pt={pt} selectedSet={selectedSet} toggleSelect={toggleSelect} blendedHue={blendedHue} isSel={isSel} ignoreNextRef={ignoreNextRef} customOpacity={customOpacity} textOpacity={textOpacity} />;
+                                    const cOp = showOnlyHighlight ? (isSel ? 0.9 : 0.03) : 0.6;
+                                    const tOp = showOnlyHighlight ? (isSel ? 1 : 0.05) : 1;
+                                    return <NotePoint key={idx} pt={pt} selectedSet={selectedSet} toggleSelect={toggleSelect} blendedHue={(pt.coord[0] + 7) / 14 * 360 * 0.75 + (pt.coord[2] + 2) / 4 * 120 * 0.25} isSel={isSel} ignoreNextRef={ignoreNextRef} customOpacity={cOp} textOpacity={tOp} />;
                                 })}
                             </Canvas>
                         </div>
                     </>
                 )}
 
-                {/* ABA 2: MULTIPLICAÇÃO */}
                 {activeTab === 2 && (
                     <div className="flex w-full h-full bg-gray-800">
-                        <div className="w-80 flex-shrink-0 min-w-[320px] bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4 shadow-lg z-10 overflow-y-auto custom-scrollbar">
-                            <div>
-                                <h3 className="text-sm font-bold text-blue-300 mb-2">Entidade A (Multiplicando)</h3>
-                                <button onClick={() => setTab2InputA(tab1MidiNotes.join(', '))} className="mb-2 text-[10px] bg-blue-800 hover:bg-blue-700 px-2 py-1 rounded">Puxar Aba 1</button>
-                                <textarea value={tab2InputA} onChange={e => setTab2InputA(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Ex: 60, 64, 67" />
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-bold text-blue-300 mb-2">Entidade B (Multiplicador)</h3>
-                                <textarea value={tab2InputB} onChange={e => setTab2InputB(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" />
-                            </div>
-                            <div className="bg-gray-950 p-3 rounded border border-gray-700 mt-auto">
-                                <span className="text-[10px] text-green-400 block font-bold">Resultado [MIDI]:</span>
-                                <div className="text-[10px] font-mono break-all text-gray-300 h-16 overflow-y-auto">[{tab2Result.join(', ')}]</div>
-                                <span className="text-[10px] text-blue-400 block mt-2 font-bold">Resultado [Notas]:</span>
-                                <div className="text-[10px] font-mono break-all text-gray-300 h-16 overflow-y-auto">[{midiArrayToNames(tab2Result)}]</div>
+                        <div className="w-80 flex-shrink-0 bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4 overflow-y-auto custom-scrollbar">
+                            <h3 className="text-sm font-bold text-blue-300">Entidade A (Multiplicando)</h3>
+                            <button onClick={() => setTab2InputA(tab1MidiNotes.join(', '))} className="text-[10px] bg-blue-800 p-1 rounded">Puxar Aba 1</button>
+                            <textarea value={tab2InputA} onChange={e => setTab2InputA(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Ex: 60, C+4, 440Hz" />
+
+                            <h3 className="text-sm font-bold text-blue-300">Entidade B (Multiplicador)</h3>
+                            <textarea value={tab2InputB} onChange={e => setTab2InputB(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" />
+
+                            <label className="flex items-center text-xs text-orange-300"><input type="checkbox" className="mr-2" checked={tab2NonTemp} onChange={e => setTab2NonTemp(e.target.checked)} /> Valores Não Temperados</label>
+
+                            <div className="bg-gray-950 p-3 rounded border border-gray-700 mt-auto flex flex-col gap-2">
+                                <span className="text-[10px] text-green-400 font-bold">Resultado [{tab2NonTemp ? "Frequência/Cents" : "MIDI/Notas"}]:</span>
+                                <div className="text-[10px] font-mono break-all text-gray-300 h-24 overflow-y-auto custom-scrollbar">
+                                    [{tab2ResultHz.map(hz => tab2NonTemp ? hzToNoteAndCents(hz) : Math.round(hzToMidi(hz))).join(', ')}]
+                                </div>
+                                <button onClick={() => playAudio(tab2ResultHz, true)} className="w-full bg-green-800 text-xs py-1 rounded">🎵 Ouvir (Acorde)</button>
                             </div>
                         </div>
-                        <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
-                            <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-widest">Visualização em Bloco (Acorde)</h2>
-                            <BachRollVisualizer notes={tab2Result} isSequence={false} />
+                        <div className="flex-1 p-4 bg-gray-950 flex flex-col">
+                            <BachRollVisualizer notes={tab2ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={tab2NonTemp} />
                         </div>
                     </div>
                 )}
 
-                {/* ABA 3: MÓDULOS CÍCLICOS */}
                 {activeTab === 3 && (
                     <div className="flex w-full h-full bg-gray-800">
-                        <div className="w-80 flex-shrink-0 min-w-[320px] bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4 shadow-lg z-10 overflow-y-auto custom-scrollbar">
-                            <div>
-                                <h3 className="text-sm font-bold text-blue-300 mb-2">Matriz Base (Melódica)</h3>
-                                <div className="flex space-x-2 mb-2">
-                                    <button onClick={() => setTab3Input(tab1MidiNotes.join(', '))} className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">Aba 1</button>
-                                    <button onClick={() => setTab3Input(tab2Result.join(', '))} className="text-[10px] bg-blue-800 hover:bg-blue-700 px-2 py-1 rounded">Aba 2</button>
-                                </div>
-                                <textarea value={tab3Input} onChange={e => setTab3Input(e.target.value)} rows="3" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Clique no teclado ao lado ou insira..." />
-                                <div className="flex space-x-1 mt-2">
-                                    <button onClick={() => setTab3Input(snapToMode(tab3ParsedInput, 1).join(', '))} className="text-[9px] bg-gray-700 p-1 rounded hover:bg-gray-600">Aprox. Modo 1</button>
-                                    <button onClick={() => setTab3Input(snapToMode(tab3ParsedInput, 2).join(', '))} className="text-[9px] bg-gray-700 p-1 rounded hover:bg-gray-600">Aprox. Modo 2</button>
+                        <div className="w-80 flex-shrink-0 bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4 overflow-y-auto custom-scrollbar">
+                            <h3 className="text-sm font-bold text-blue-300">Matriz Base (Melódica)</h3>
+                            <button onClick={() => setTab3Input(arrToStr(tab2ResultHz))} className="text-[10px] bg-blue-800 p-1 rounded">Puxar Aba 2</button>
+                            <textarea value={tab3Input} onChange={e => setTab3Input(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" />
+
+                            <div className="pt-2 border-t border-gray-700">
+                                <h4 className="text-xs font-bold text-gray-400 mb-2">Aproximar a Modo de Messiaen:</h4>
+                                <div className="grid grid-cols-1 gap-1">
+                                    {Object.entries(messiaenModes).map(([k, v]) => (
+                                        <button key={k} onClick={() => setTab3Input(snapToMode(tab3ParsedInput, k).join(', '))} className="text-[9px] bg-gray-700 p-1 rounded text-left hover:bg-gray-600">{v.name}</button>
+                                    ))}
                                 </div>
                             </div>
-                            <div className="bg-gray-950 p-3 rounded border border-gray-700 mt-auto flex flex-col">
-                                <span className="text-[10px] text-green-400 block font-bold">Módulo Gerado [MIDI] - ({tab3Result.length} notas):</span>
-                                <div className="text-[10px] font-mono break-all text-gray-300 overflow-y-auto max-h-24 flex-1 mb-2">[{tab3Result.join(', ')}]</div>
-                                <span className="text-[10px] text-blue-400 block border-t border-gray-800 pt-1 font-bold">Módulo Gerado [Notas]:</span>
-                                <div className="text-[10px] font-mono break-all text-gray-300 overflow-y-auto max-h-24 flex-1">[{midiArrayToNames(tab3Result)}]</div>
+
+                            <div className="bg-gray-950 p-3 rounded border border-gray-700 mt-auto">
+                                <span className="text-[10px] text-green-400 font-bold">Módulo [{tab3Result.length} notas]:</span>
+                                <div className="text-[10px] font-mono break-all text-gray-300 h-20 overflow-y-auto">[{midiArrayToNames(tab3Result)}]</div>
+                                <div className="flex gap-2 mt-2">
+                                    <button onClick={() => playAudio(tab3Result.map(midiToHz), false)} className="flex-1 bg-green-800 text-[10px] py-1 rounded">🎵 Melodia</button>
+                                    <button onClick={() => playAudio(tab3Result.map(midiToHz), true)} className="flex-1 bg-green-700 text-[10px] py-1 rounded">🎵 Acorde</button>
+                                </div>
                             </div>
                         </div>
-                        <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
-                            <div className="flex justify-between items-center mb-2">
-                                <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Sequência Temporal (Clique no teclado para adicionar)</h2>
-                                <button onClick={() => setTab3Input("")} className="bg-red-900 hover:bg-red-800 text-white text-[10px] px-2 py-1 rounded">Limpar Teclado</button>
-                            </div>
-                            <BachRollVisualizer notes={tab3Result} isSequence={true} onKeyClick={(midi) => setTab3Input(prev => prev ? prev + ", " + midi : String(midi))} onNoteDrag={handleTab3Drag} onNoteDelete={handleTab3Delete} originalEntityLength={tab3ParsedInput.length} />
+                        <div className="flex-1 p-4 bg-gray-950 flex flex-col">
+                            <BachRollVisualizer notes={tab3Result} isSequence={true} onKeyClick={m => setTab3Input(prev => prev ? prev + ", " + m : String(m))} onNoteDrag={handleTab3Drag} onNoteDelete={handleTab3Delete} originalEntityLength={tab3ParsedInput.length} />
                         </div>
                     </div>
                 )}
 
-                {/* ABA 4: PROJEÇÕES PROPORCIONAIS */}
                 {activeTab === 4 && (
                     <div className="flex w-full h-full bg-gray-800">
-                        <div className="w-96 flex-shrink-0 min-w-[380px] bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4 shadow-lg z-10 overflow-y-auto custom-scrollbar">
-                            <div>
-                                <h3 className="text-sm font-bold text-blue-300 mb-2">Fluxo Temperado Original</h3>
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    <button onClick={() => setTab4Input(tab1MidiNotes.join(', '))} className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">Aba 1</button>
-                                    <button onClick={() => setTab4Input(tab2Result.join(', '))} className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">Aba 2</button>
-                                    <button onClick={() => setTab4Input(tab3Result.join(', '))} className="text-[10px] bg-blue-800 hover:bg-blue-700 px-2 py-1 rounded">Aba 3</button>
-                                </div>
-                                <textarea value={tab4Input} onChange={e => setTab4Input(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Clique no teclado para inserir notas bases..." />
-                            </div>
+                        <div className="w-96 flex-shrink-0 bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4 overflow-y-auto custom-scrollbar">
+                            <h3 className="text-sm font-bold text-blue-300">Fluxo Temperado (Input)</h3>
+                            <button onClick={() => setTab4Input(tab3Result.join(', '))} className="text-[10px] bg-blue-800 p-1 rounded">Puxar Aba 3</button>
+                            <textarea value={tab4Input} onChange={e => setTab4Input(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" />
 
                             <div className="border-t border-gray-700 pt-4 space-y-4">
-                                <div className="flex justify-between items-center mb-2">
-                                    <h4 className="text-xs font-bold text-purple-300">Escalonamento de Frequência</h4>
-                                    <button onClick={handleNormalizeFreqs} className="bg-purple-800 hover:bg-purple-700 text-[10px] px-2 py-1 rounded">Normalizar p/ Entrada</button>
-                                </div>
-                                <div>
-                                    <label className="flex justify-between text-xs text-gray-300 font-bold mb-1">Alvo Mínimo: <span>{targetMinHz} Hz</span></label>
-                                    <div className="flex space-x-2 items-center">
-                                        <input type="range" min="20" max="2000" step="1" value={targetMinHz} onChange={e => setTargetMinHz(Number(e.target.value))} className="w-full accent-blue-500" />
-                                        <input type="number" value={targetMinHz} onChange={e => setTargetMinHz(Number(e.target.value))} className="w-16 bg-gray-800 text-xs p-1 text-center rounded border border-gray-600" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="flex justify-between text-xs text-gray-300 font-bold mb-1">Alvo Máximo: <span>{targetMaxHz} Hz</span></label>
-                                    <div className="flex space-x-2 items-center">
-                                        <input type="range" min="20" max="10000" step="1" value={targetMaxHz} onChange={e => setTargetMaxHz(Number(e.target.value))} className="w-full accent-blue-500" />
-                                        <input type="number" value={targetMaxHz} onChange={e => setTargetMaxHz(Number(e.target.value))} className="w-16 bg-gray-800 text-xs p-1 text-center rounded border border-gray-600" />
-                                    </div>
-                                </div>
+                                <button onClick={handleNormalizeFreqs} className="w-full bg-purple-800 hover:bg-purple-700 text-[10px] py-1 rounded">Normalizar para Freqs de Entrada</button>
+                                <div><label className="text-xs text-gray-300">Alvo Min: {targetMinHz} Hz</label><input type="range" min="20" max="2000" value={targetMinHz} onChange={e => setTargetMinHz(Number(e.target.value))} className="w-full accent-blue-500" /></div>
+                                <div><label className="text-xs text-gray-300">Alvo Max: {targetMaxHz} Hz</label><input type="range" min="20" max="10000" value={targetMaxHz} onChange={e => setTargetMaxHz(Number(e.target.value))} className="w-full accent-blue-500" /></div>
                             </div>
 
                             <div className="bg-gray-950 p-3 rounded border border-gray-700 mt-auto flex flex-col h-1/3">
-                                <span className="text-[10px] text-green-400 block font-bold">Espectro Projetado [Hertz]:</span>
-                                <div className="text-[10px] font-mono break-all text-gray-300 overflow-y-auto custom-scrollbar flex-1 mb-2">[{tab4Result.map(n => n.toFixed(2)).join(', ')}]</div>
-                                <span className="text-[10px] text-blue-400 block font-bold border-t border-gray-800 pt-1">Aprox. [Quartos de Tom]:</span>
-                                <div className="text-[10px] font-mono break-all text-gray-300 overflow-y-auto custom-scrollbar flex-1">[{midiArrayToQuarterTones(tab4MidiEquivalents)}]</div>
+                                <span className="text-[10px] text-green-400 font-bold">Espectro Projetado:</span>
+                                <div className="text-[10px] font-mono break-all text-gray-300 overflow-y-auto flex-1 mb-2">[{tab4ResultHz.map(hzToNoteAndCents).join(', ')}]</div>
+                                <button onClick={() => playAudio(tab4ResultHz, true)} className="w-full bg-green-800 text-xs py-1 rounded mt-2">🎵 Ouvir Espectro</button>
                             </div>
                         </div>
-                        <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
-                            <div className="flex justify-between items-center mb-2">
-                                <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Projeção de Espectro (Microtonal)</h2>
-                                <button onClick={() => setTab4Input("")} className="bg-red-900 hover:bg-red-800 text-white text-[10px] px-2 py-1 rounded">Limpar Teclado</button>
-                            </div>
-                            <BachRollVisualizer notes={tab4MidiEquivalents} isSequence={true} isMicrotonal={true} onKeyClick={(midi) => setTab4Input(prev => prev ? prev + ", " + midi : String(midi))} onNoteDelete={handleTab4Delete} />
+                        <div className="flex-1 p-4 bg-gray-950 flex flex-col">
+                            <BachRollVisualizer notes={tab4MidiEquivalents} isSequence={true} isMicrotonal={true} onKeyClick={m => setTab4Input(prev => prev ? prev + ", " + m : String(m))} onNoteDelete={handleTab4Delete} />
                         </div>
                     </div>
                 )}
 
-                {/* ABA 5: PERMUTAÇÕES SIMÉTRICAS (MESSIAEN) */}
                 {activeTab === 5 && (
                     <div className="flex w-full h-full bg-gray-800">
-                        <div className="w-80 flex-shrink-0 min-w-[320px] bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4 shadow-lg z-10 overflow-y-auto custom-scrollbar">
-                            <div>
-                                <h3 className="text-sm font-bold text-purple-300 mb-2">Entidade Harmônica</h3>
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    <button onClick={() => setTab5Input(tab1MidiNotes.join(', '))} className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">Aba 1</button>
-                                    <button onClick={() => setTab5Input(tab2Result.join(', '))} className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">Aba 2</button>
-                                    <button onClick={() => setTab5Input(tab3Result.join(', '))} className="text-[10px] bg-blue-800 hover:bg-blue-700 px-2 py-1 rounded">Aba 3</button>
-                                </div>
-                                <textarea value={tab5Input} onChange={e => setTab5Input(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Ex: 60, 64, 67, 72" />
-                            </div>
-
-                            <div>
-                                <h3 className="text-sm font-bold text-purple-300 mb-2">Vetor de Permutação (Índices)</h3>
-                                <textarea value={tab5Perm} onChange={e => setTab5Perm(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Ex: 2, 3, 4, 1" />
-                            </div>
-
+                        <div className="w-80 flex-shrink-0 bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4 overflow-y-auto custom-scrollbar">
+                            <h3 className="text-sm font-bold text-purple-300">Entidade (Notas)</h3>
+                            <textarea value={tab5Input} onChange={e => setTab5Input(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Ex: 60, 64, 67, 72" />
+                            <h3 className="text-sm font-bold text-purple-300">Vetor de Permutação</h3>
+                            <textarea value={tab5Perm} onChange={e => setTab5Perm(e.target.value)} rows="1" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Ex: 2, 3, 4, 1" />
                             <div className="border-t border-gray-700 pt-4">
-                                <h4 className="text-xs font-bold text-gray-300 mb-2">Modo de Exibição</h4>
-                                <div className="flex flex-col space-y-2">
-                                    <label className="text-xs flex items-center"><input type="radio" name="viewMode" className="mr-2" checked={tab5ViewMode === 'notes'} onChange={() => setTab5ViewMode('notes')} /> Notas (ex: C3)</label>
-                                    <label className="text-xs flex items-center"><input type="radio" name="viewMode" className="mr-2" checked={tab5ViewMode === 'indices'} onChange={() => setTab5ViewMode('indices')} /> Índices Formais (ex: 1, 2, 3)</label>
-                                    <label className="text-xs flex items-center"><input type="radio" name="viewMode" className="mr-2" checked={tab5ViewMode === 'pcs'} onChange={() => setTab5ViewMode('pcs')} /> Pitch Class (0 a 11)</label>
-                                </div>
+                                <h4 className="text-xs font-bold text-gray-300 mb-2">Exibição</h4>
+                                {['notes', 'indices', 'pcs'].map(mode => (
+                                    <label key={mode} className="text-xs flex items-center mb-1"><input type="radio" name="vm" checked={tab5ViewMode === mode} onChange={() => setTab5ViewMode(mode)} className="mr-2" /> {mode === 'notes' ? 'Notas/MIDI' : mode === 'indices' ? 'Índices Formais' : 'Pitch Class (0-11)'}</label>
+                                ))}
                             </div>
                         </div>
                         <div className="flex-1 p-5 bg-gray-950 flex flex-col overflow-y-auto custom-scrollbar">
-                            <h2 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-widest border-b border-gray-800 pb-2">Ciclo Completo da Permutação</h2>
+                            <h2 className="text-sm font-bold text-gray-400 mb-4 uppercase">Ciclos Gerados Iterativamente</h2>
                             <div className="space-y-2">
                                 {tab5Result.map((iter, idx) => (
-                                    <div key={idx} className="bg-gray-900 p-3 rounded border border-gray-800 flex">
-                                        <span className="w-12 text-purple-400 font-bold text-xs">P{idx}:</span>
-                                        <span className="text-xs font-mono text-gray-300">[{formatTab5Output(iter)}]</span>
+                                    <div key={idx} className="bg-gray-900 p-2 rounded border border-gray-800 flex items-center justify-between">
+                                        <div className="flex items-center">
+                                            <span className="w-8 text-purple-400 font-bold text-xs">P{idx}:</span>
+                                            <span className="text-xs font-mono text-gray-300">[{formatTab5Output(iter)}]</span>
+                                        </div>
+                                        <button onClick={() => playAudio(iter.map(midiToHz), false)} className="bg-green-800 hover:bg-green-700 text-[10px] px-2 py-1 rounded">🎵 Ouvir</button>
                                     </div>
                                 ))}
                             </div>
@@ -661,44 +704,86 @@ function HarmonicNetwork() {
                     </div>
                 )}
 
-                {/* ABA 6: MATRIZ DODECAFÔNICA */}
                 {activeTab === 6 && (
                     <div className="flex w-full h-full bg-gray-800">
-                        <div className="w-80 flex-shrink-0 min-w-[320px] bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4 shadow-lg z-10 overflow-y-auto custom-scrollbar">
-                            <div>
-                                <h3 className="text-sm font-bold text-red-400 mb-2">Série Original (P0)</h3>
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    <button onClick={() => setTab6Input(tab1MidiNotes.join(', '))} className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">Aba 1</button>
-                                    <button onClick={() => setTab6Input(tab3Result.join(', '))} className="text-[10px] bg-blue-800 hover:bg-blue-700 px-2 py-1 rounded">Aba 3</button>
-                                </div>
-                                <textarea value={tab6Input} onChange={e => setTab6Input(e.target.value)} rows="3" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Insira 12 notas (ex: 0, 1, 2...)" />
-                                <p className="text-[10px] text-gray-400 mt-2">Dica: A matriz removerá notas repetidas automaticamente. Se a entrada tiver menos de 12 notas, ela calculará uma matriz menor.</p>
-                            </div>
+                        <div className="w-80 flex-shrink-0 bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4">
+                            <h3 className="text-sm font-bold text-red-400">Série Original (P0)</h3>
+                            <textarea value={tab6Input} onChange={e => setTab6Input(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" />
+                            <label className="text-xs text-orange-300"><input type="checkbox" className="mr-2" checked={tab6Gt12} onChange={e => setTab6Gt12(e.target.checked)} /> Liberar mais de 12 notas</label>
+                            <label className="text-xs text-gray-300"><input type="checkbox" className="mr-2" checked={tab6View === "note"} onChange={e => setTab6View(e.target.checked ? "note" : "pc")} /> Mostrar Notas Musicais</label>
+                            <button onClick={() => playAudio(tab6Matrix.row.map(midiToHz), false)} className="bg-green-800 text-xs py-2 rounded">🎵 Ouvir Série P0</button>
                         </div>
-                        <div className="flex-1 p-5 bg-gray-950 flex flex-col overflow-y-auto custom-scrollbar items-center">
-                            <h2 className="text-sm font-bold text-gray-400 mb-6 uppercase tracking-widest">Matriz 12x12</h2>
-                            {tab6Matrix.length > 0 ? (
-                                <table className="border-collapse bg-gray-900 border border-gray-600 shadow-2xl">
+                        <div className="flex-1 p-5 bg-gray-950 overflow-auto custom-scrollbar items-center justify-center flex">
+                            {tab6Matrix.m.length > 0 && (
+                                <table className="border-collapse bg-gray-900 border border-gray-500 shadow-2xl text-center">
+                                    <thead>
+                                        <tr><th className="p-1"></th>{tab6Matrix.inv.map((v, i) => <th key={i} className="text-[10px] text-blue-300 border border-gray-700 p-1">I{tab6Gt12 ? i : v}↓</th>)}<th className="p-1"></th></tr>
+                                    </thead>
                                     <tbody>
-                                        {tab6Matrix.map((row, rIdx) => (
-                                            <tr key={`r-${rIdx}`}>
-                                                {row.map((val, cIdx) => {
-                                                    // Destaque para a diagonal principal (opcional, estética)
-                                                    const isDiag = val === tab6Matrix[0][0];
-                                                    return (
-                                                        <td key={`c-${cIdx}`} className={`border border-gray-700 w-10 h-10 text-center font-mono text-xs ${isDiag ? 'bg-gray-800 text-red-300 font-bold' : 'text-gray-300'}`}>
-                                                            {val}
-                                                        </td>
-                                                    );
-                                                })}
+                                        {tab6Matrix.m.map((row, rIdx) => (
+                                            <tr key={rIdx}>
+                                                <th className="text-[10px] text-green-300 border border-gray-700 p-1">P{tab6Gt12 ? rIdx : tab6Matrix.row[rIdx]}→</th>
+                                                {row.map((val, cIdx) => <td key={cIdx} className={`border border-gray-700 w-10 h-10 font-mono text-xs ${val === tab6Matrix.m[0][0] ? 'bg-gray-800 font-bold' : ''}`}>{tab6View === "note" ? midiToNote(val) : val}</td>)}
+                                                <th className="text-[10px] text-yellow-300 border border-gray-700 p-1">←R{tab6Gt12 ? rIdx : tab6Matrix.row[rIdx]}</th>
                                             </tr>
                                         ))}
                                     </tbody>
+                                    <tfoot>
+                                        <tr><th className="p-1"></th>{tab6Matrix.inv.map((v, i) => <th key={i} className="text-[10px] text-purple-300 border border-gray-700 p-1">↑RI{tab6Gt12 ? i : v}</th>)}<th className="p-1"></th></tr>
+                                    </tfoot>
                                 </table>
-                            ) : (
-                                <p className="text-gray-500 text-sm">Insira pelo menos 1 nota para gerar a matriz.</p>
                             )}
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 7 && (
+                    <div className="flex w-full h-full bg-gray-800">
+                        <div className="w-80 flex-shrink-0 bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4">
+                            <h3 className="text-sm font-bold text-yellow-400">Entradas (Portadoras)</h3>
+                            <textarea value={tab7Input} onChange={e => setTab7Input(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Ex: 440Hz, 500Hz" />
+                            <div><label className="text-xs text-gray-300">Máx Resultados: {tab7Limit}</label><input type="range" min="1" max="100" value={tab7Limit} onChange={e => setTab7Limit(Number(e.target.value))} className="w-full accent-yellow-500" /></div>
+                            <div className="bg-gray-950 p-3 rounded mt-auto h-1/2 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+                                <span className="text-[10px] text-yellow-400 font-bold">Frequências (Soma/Diferença):</span>
+                                <div className="text-[10px] font-mono break-all text-gray-300">[{tab7ResultHz.map(hzToNoteAndCents).join(', ')}]</div>
+                                <button onClick={() => playAudio(tab7ResultHz, true)} className="w-full bg-green-800 text-xs py-1 rounded">🎵 Ouvir Espectro</button>
+                            </div>
+                        </div>
+                        <div className="flex-1 p-4 bg-gray-950"><BachRollVisualizer notes={tab7ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} /></div>
+                    </div>
+                )}
+
+                {activeTab === 8 && (
+                    <div className="flex w-full h-full bg-gray-800">
+                        <div className="w-80 flex-shrink-0 bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4">
+                            <h3 className="text-sm font-bold text-cyan-400">Síntese FM</h3>
+                            <label className="text-xs">Portadora (C): <input type="text" value={tab8Carrier} onChange={e => setTab8Carrier(e.target.value)} className="w-full bg-gray-800 p-1 rounded font-mono" /></label>
+                            <label className="text-xs">Moduladora (M): <input type="text" value={tab8Modulator} onChange={e => setTab8Modulator(e.target.value)} className="w-full bg-gray-800 p-1 rounded font-mono" /></label>
+                            <div><label className="text-xs">Índice (K partials): {tab8K}</label><input type="range" min="1" max="30" value={tab8K} onChange={e => setTab8K(Number(e.target.value))} className="w-full accent-cyan-500" /></div>
+                            <div className="bg-gray-950 p-3 rounded mt-auto h-1/2 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+                                <span className="text-[10px] text-cyan-400 font-bold">Bandas Laterais (C ± kM):</span>
+                                <div className="text-[10px] font-mono break-all text-gray-300">[{tab8ResultHz.map(hzToNoteAndCents).join(', ')}]</div>
+                                <button onClick={() => playAudio(tab8ResultHz, true)} className="w-full bg-green-800 text-xs py-1 rounded">🎵 Ouvir Timbre FM</button>
+                            </div>
+                        </div>
+                        <div className="flex-1 p-4 bg-gray-950"><BachRollVisualizer notes={tab8ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} /></div>
+                    </div>
+                )}
+
+                {activeTab === 9 && (
+                    <div className="flex w-full h-full bg-gray-800">
+                        <div className="w-80 flex-shrink-0 bg-gray-900 p-5 border-r border-gray-700 flex flex-col space-y-4">
+                            <h3 className="text-sm font-bold text-pink-400">Síntese Aditiva Espectral</h3>
+                            <textarea value={tab9Input} onChange={e => setTab9Input(e.target.value)} rows="2" className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" placeholder="Insira as Frequências ou Notas base" />
+                            <div><label className="text-xs">Harmônicos (xN): {tab9Harmonics}</label><input type="range" min="1" max="16" value={tab9Harmonics} onChange={e => setTab9Harmonics(Number(e.target.value))} className="w-full accent-pink-500" /></div>
+                            <div><label className="text-xs">Sub-harmônicos (/N): {tab9Sub}</label><input type="range" min="1" max="8" value={tab9Sub} onChange={e => setTab9Sub(Number(e.target.value))} className="w-full accent-pink-500" /></div>
+                            <div className="bg-gray-950 p-3 rounded mt-auto h-1/2 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+                                <span className="text-[10px] text-pink-400 font-bold">Espectro Gerado:</span>
+                                <div className="text-[10px] font-mono break-all text-gray-300">[{tab9ResultHz.map(hzToNoteAndCents).join(', ')}]</div>
+                                <button onClick={() => playAudio(tab9ResultHz, true)} className="w-full bg-green-800 text-xs py-1 rounded">🎵 Ouvir Complexo</button>
+                            </div>
+                        </div>
+                        <div className="flex-1 p-4 bg-gray-950"><BachRollVisualizer notes={tab9ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} /></div>
                     </div>
                 )}
 
