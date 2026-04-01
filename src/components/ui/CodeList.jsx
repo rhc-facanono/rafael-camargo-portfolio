@@ -8,162 +8,162 @@ const MARINHO = "#9fb1db";
 const codeData = [
     {
         id: "tool-redes", type: "tool", toolIndex: 1,
-        label: "Redes Harmônicas",
-        color: MARINHO,
+        label: "Redes Harmônicas 3D",
+        color: "#9fb1db",
         icon: <circle cx="12" cy="12" r="8" stroke="white" strokeWidth="2" fill="none" strokeDasharray="4 4" />,
         contexto: {
-            pt: "Desenvolvida a partir da teoria de Henri Pousseur, esta ferramenta espacializa a harmonia num labirinto 3D infinito. Os eixos (X, Y, Z) representam distâncias intervalares estruturais (como 5ªs, 8vas e 3ªs), permitindo navegar por campos harmônicos de forma puramente simétrica.",
-            en: "Based on Henri Pousseur's theory, this tool spatializes harmony in an infinite 3D maze. The axes (X, Y, Z) represent structural interval distances, allowing navigation through harmonic fields symmetrically.",
-            es: "Basada en la teoría de Henri Pousseur, esta herramienta espacializa la armonía en un laberinto 3D infinito. Los ejes representan distancias interválicas estructurales."
+            pt: "Baseada na 'Tonnetz' de Euler e nas teorias de Henri Pousseur, esta ferramenta espacializa a harmonia num labirinto 3D infinito. Os eixos X, Y e Z representam distâncias intervalares, permitindo navegar por campos harmônicos de forma geometricamente simétrica.",
+            en: "Based on Euler's 'Tonnetz' and Henri Pousseur's theories, this tool spatializes harmony in an infinite 3D maze. The X, Y, and Z axes represent interval distances, allowing navigation through symmetric harmonic fields.",
+            es: "Basada en la 'Tonnetz' de Euler y las teorías de Henri Pousseur, esta herramienta espacializa la armonía en un laberinto 3D infinito. Los ejes representan distancias interválicas estructurales."
         },
         comoUsar: {
-            pt: "Configure o intervalo de cada eixo à esquerda. Na janela 3D, faça Cmd+Clique (Mac) ou Ctrl+Clique (Win) nas esferas para selecionar as notas e formar o seu acorde base. Use Alt+Arraste para mover a câmara.",
-            en: "Configure the interval for each axis. In the 3D window, Cmd+Click (Mac) or Ctrl+Click (Win) on the spheres to select notes. Alt+Drag to pan the camera.",
-            es: "Configure el intervalo para cada eje. En la ventana 3D, presione Cmd+Clic (Mac) o Ctrl+Clic (Win) en las esferas para seleccionar notas. Alt+Arrastrar para mover la cámara."
+            pt: "Configure o intervalo de cada eixo à esquerda (em semitons ou cents, se o Modo Xenharmônico estiver ativo). Na janela 3D, segure Ctrl (ou Cmd) e clique nas esferas para selecionar notas. Exporte o resultado como MIDI ou áudio.",
+            en: "Set the interval for each axis on the left (in semitones or cents). In the 3D window, hold Ctrl/Cmd and click the spheres to select notes. Export the result as MIDI or audio.",
+            es: "Configure el intervalo de cada eje a la izquierda. En la ventana 3D, mantenga presionado Ctrl/Cmd y haga clic en las esferas para seleccionar notas. Exporte el resultado como MIDI."
         }
     },
     {
-        id: "tool-boulez", type: "tool", toolIndex: 2,
+        id: "tool-multiplicacao", type: "tool", toolIndex: 2,
         label: "Multiplicação de Acordes",
-        color: VINHO,
-        icon: <path d="M4 4h6v6H4zm10 10h6v6h-6zM10 10l4 4" stroke="white" strokeWidth="2" fill="none" />,
+        color: "#e4a8bc",
+        icon: <rect x="4" y="4" width="16" height="16" stroke="white" strokeWidth="2" fill="none" transform="rotate(45 12 12)" />,
         contexto: {
-            pt: "Técnica serial do compositor Pierre Boulez. O Acorde B atua como um 'filtro estrutural' ou espelho: o algoritmo transpõe o Acorde A inteiro a partir de cada uma das notas do Acorde B, fundindo os resultados num único bloco denso de alta densidade espectral.",
-            en: "Serial technique by Pierre Boulez. Chord B acts as a structural filter, transposing Chord A onto every note of Chord B, creating a dense spectral block.",
-            es: "Técnica serial de Pierre Boulez. El Acorde B actúa como un filtro estructural que transpone el Acorde A a partir de cada nota del Acorde B."
+            pt: "Técnica fundamental do serialismo integral (usada por Pierre Boulez). A Multiplicação de Acordes transpõe uma Entidade A (multiplicando) para cada nota de uma Entidade B (multiplicador), gerando complexos harmônicos densos e coerentes.",
+            en: "A fundamental technique of integral serialism (used by Pierre Boulez). Chord Multiplication transposes Entity A onto every note of Entity B, generating dense, coherent harmonic complexes.",
+            es: "Técnica fundamental del serialismo integral (Boulez). Transpone la Entidad A sobre cada nota de la Entidad B, generando complejos armónicos densos."
         },
         comoUsar: {
-            pt: "Insira notas na Entidade A e B separadas por vírgula (ex: 60, 64, 67). Para operar na vanguarda acústica, marque 'Valores Não Temperados' e digite notas com microtons, como C+4 (quarto de tom) ou diretamente em Hertz (ex: 440Hz).",
-            en: "Insert notes in Entity A and B. Check 'Non-Tempered' to use microtones like C+4 (quarter tone) or raw Hertz (440Hz).",
-            es: "Inserte notas en Entidad A y B. Marque 'Valores No Temperados' para usar microtonos como C+4 o Hertz puros (440Hz)."
+            pt: "Insira as notas da Entidade A e B usando as caixas de texto ou a partitura. Marque 'Valores Não Temperados' para multiplicar as proporções exatas em Hertz (just intonation) em vez de saltos MIDI temperados.",
+            en: "Input notes for Entity A and B via text or the staff. Check 'Non-Tempered Values' to multiply exact Hertz ratios (just intonation) instead of tempered MIDI steps.",
+            es: "Ingrese las notas de la Entidad A y B. Marque 'Valores No Temperados' para multiplicar proporciones exactas en Hertz en lugar de pasos MIDI."
         }
     },
     {
         id: "tool-modulos", type: "tool", toolIndex: 3,
         label: "Módulos Cíclicos",
-        color: MARINHO,
-        icon: <path d="M12 4a8 8 0 1 1-8 8" stroke="white" strokeWidth="2" fill="none" markerEnd="url(#arrow)" />,
+        color: "#c0a8e4",
+        icon: <path d="M12 2v20m-10-10h20" stroke="white" strokeWidth="2" strokeLinecap="round" />,
         contexto: {
-            pt: "Metodologia de Flo Menezes conhecida como 'defloramento horizontal'. A harmonia base sofre uma expansão temporal: o motivo é transposto sucessivamente pelo seu próprio intervalo-limite até retornar à oitava da nota de partida, criando uma melodia inerente à própria harmonia.",
-            en: "Flo Menezes' cyclic modules. The base harmony undergoes a temporal expansion: the motif is successively transposed by its limit-interval until returning to the octave.",
-            es: "Módulos cíclicos de Flo Menezes. La armonía base sufre una expansión temporal transponiendo el motivo por su intervalo-límite."
+            pt: "Inspirado nas escalas de transposição limitada de Olivier Messiaen e na harmonia pós-tonal. Gera padrões simétricos infinitos repetindo um intervalo gerador até fechar o ciclo da oitava ou do temperamento atual.",
+            en: "Inspired by Olivier Messiaen's modes of limited transposition. Generates infinite symmetrical patterns by repeating a generating interval until the octave cycle closes.",
+            es: "Inspirado en los modos de transposición limitada de Messiaen. Genera patrones simétricos infinitos repitiendo un intervalo generador."
         },
         comoUsar: {
-            pt: "Use Ctrl+Clique / Cmd+Clique diretamente nas linhas e espaços da Partitura para escrever o seu motivo melódico base. O algoritmo desdobrará o módulo de forma cíclica automaticamente à direita.",
-            en: "Ctrl+Click / Cmd+Click directly on the musical staff to write your base motif. The cyclic module will unfold automatically.",
-            es: "Ctrl+Clic / Cmd+Clic directamente en el pentagrama para escribir su motivo base. El módulo se desarrollará automáticamente."
+            pt: "Insira uma pequena célula melódica (ex: C, Db, E). O sistema calculará o intervalo total da célula e a repetirá simetricamente. Use os botões 'Aproximar a Modo de Messiaen' para forçar as notas a caírem em escalas históricas.",
+            en: "Input a short melodic cell. The system will repeat it symmetrically. Use the 'Snap to Messiaen Mode' buttons to force notes into historical scales.",
+            es: "Ingrese una pequeña célula melódica. El sistema la repetirá simétricamente. Use los botones para ajustar las notas a los Modos de Messiaen."
         }
     },
     {
         id: "tool-projecoes", type: "tool", toolIndex: 4,
         label: "Projeções Proporcionais",
-        color: VINHO,
-        icon: <path d="M4 20L20 4M4 12l8-8M12 20l8-8" stroke="white" strokeWidth="2" fill="none" />,
+        color: "#a8e4bc",
+        icon: <polygon points="12,2 22,20 2,20" stroke="white" strokeWidth="2" fill="none" />,
         contexto: {
-            pt: "Uma técnica espectral que estica ou comprime as proporções de um acorde dentro de novos limites físicos. Rompe as grades do sistema temperado ocidental ao calcular as proporções logaritmicamente puras no domínio da frequência (Hz).",
-            en: "A spectral technique that stretches or compresses chord proportions within new limits, breaking the tempered system by calculating pure logarithmic Hertz ratios.",
-            es: "Técnica espectral que comprime proporciones de un acorde dentro de nuevos límites, calculando proporciones logarítmicas puras en Hertz."
+            pt: "Conceito do Espectralismo. Permite expandir ou comprimir o espaço acústico de um acorde, mantendo a proporção logarítmica entre as notas. Transforma clusters densos em texturas abertas (e vice-versa) preservando a 'impressão digital' intervalar.",
+            en: "A Spectralism concept. Expands or compresses the acoustic space of a chord, maintaining the logarithmic proportion between notes. Transforms dense clusters into open textures.",
+            es: "Concepto del Espectralismo. Expande o comprime el espacio acústico de un acorde, manteniendo la proporción logarítmica entre las notas."
         },
         comoUsar: {
-            pt: "Insira as notas de origem na caixa de texto. Deslize as barras de Alvo Mínimo e Alvo Máximo. A ferramenta comprimirá ou esticará os intervalos originais de forma proporcional, gerando um espectro microtonal absoluto.",
-            en: "Input the source notes. Adjust the Min and Max Target sliders to compress or stretch the original intervals proportionally into a microtonal spectrum.",
-            es: "Inserte las notas de origen. Ajuste los controles de Objetivo Mínimo y Máximo para comprimir o estirar los intervalos proporcionalmente."
+            pt: "Insira um acorde base. Use os sliders 'Min' e 'Max' para definir o novo teto e chão de frequências em Hertz. O acorde será espremido ou esticado para caber nesse novo espaço.",
+            en: "Enter a base chord. Use the 'Min' and 'Max' sliders to set the new frequency boundaries in Hertz. The chord will be stretched to fit the new space.",
+            es: "Ingrese un acorde base. Use los controles 'Min' y 'Max' para establecer los nuevos límites de frecuencia en Hertz."
         }
     },
     {
         id: "tool-matriz", type: "tool", toolIndex: 5,
         label: "Matriz Dodecafônica",
-        color: MARINHO,
-        icon: <rect x="4" y="4" width="16" height="16" stroke="white" strokeWidth="2" fill="none" strokeDasharray="4 4" />,
+        color: "#e4d9a8",
+        icon: <rect x="3" y="3" width="18" height="18" stroke="white" strokeWidth="2" fill="none" strokeDasharray="6 6" />,
         contexto: {
-            pt: "A base de todo o Serialismo da Segunda Escola de Viena (Schoenberg e Webern). Esta ferramenta calcula instantaneamente o quadrado mágico de permutações: Prime (P), Inversion (I), Retrograde (R) e Retrograde Inversion (RI).",
-            en: "The foundation of the Second Viennese School Serialism. Calculates the magic square of permutations: Prime, Inversion, Retrograde, and Retrograde Inversion.",
-            es: "La base del Serialismo. Calcula el cuadrado mágico de permutaciones: Prime, Inversión, Retrógrado y Retrogradación Invertida."
+            pt: "A base do Dodecafonismo de Schoenberg. Calcula todas as permutações (Original, Retrógrado, Inversão e Retrógrado da Inversão) de uma série. O 'Modo Livre' permite expandir a matriz para microtonalismo (NxN).",
+            en: "The foundation of Schoenberg's Twelve-Tone technique. Calculates all permutations of a series. The 'Free Mode' allows expanding the matrix for microtonality (NxN).",
+            es: "La base del Dodecafonismo de Schoenberg. Calcula todas las permutaciones de una serie. El 'Modo Libre' permite expandir la matriz."
         },
         comoUsar: {
-            pt: "Escreva as 12 notas de sua série. Marque a opção 'Permitir mais de 12 notas' se quiser criar matrizes tonais ou modais de expansão livre. Altere o menu para visualizar em Notas, Pitch Classes (0-11) ou Frequências.",
-            en: "Enter your 12-tone row. Check 'Allow > 12 notes' for free/tonal matrices. Switch views to see Notes, Pitch Classes, or Frequencies.",
-            es: "Ingrese su serie. Marque 'Permitir > 12 notas' para matrices libres. Cambie la vista para ver Notas, Pitch Classes o Frecuencias."
+            pt: "Insira uma série de notas. A tabela gerará a matriz completa. Altere a visualização no menu dropdown para ver os resultados em Classes de Notas (0-11), Notas Musicais, Hertz ou Quartos de Tom.",
+            en: "Enter a tone row. The table will generate the full matrix. Change the view in the dropdown to see results in Pitch Classes, Notes, Hertz, or Quarter Tones.",
+            es: "Ingrese una serie de notas. Cambie la vista en el menú desplegable para ver resultados en Clases de Notas, Notas, Hertz o Cuartos de Tono."
         }
     },
     {
-        id: "tool-ringmod", type: "tool", toolIndex: 6,
-        label: "Modulação em Anel",
-        color: VINHO,
-        icon: <g><circle cx="9" cy="12" r="5" stroke="white" strokeWidth="2" fill="none" /><circle cx="15" cy="12" r="5" stroke="white" strokeWidth="2" fill="none" /></g>,
+        id: "tool-ring", type: "tool", toolIndex: 6,
+        label: "Ring Modulation",
+        color: "#db9f9f",
+        icon: <circle cx="12" cy="12" r="8" stroke="white" strokeWidth="2" fill="none" />,
         contexto: {
-            pt: "A Modulação em Anel (Ring Modulation) é um pilar da música eletroacústica. Ao multiplicar dois sinais no domínio do tempo, as frequências originais desaparecem, dando lugar ao surgimento de bandas puramente inarmônicas geradas pela Soma (A+B) e Diferença (|A-B|).",
-            en: "Ring Modulation is an electroacoustic pillar. Multiplying two signals makes original frequencies disappear, creating inharmonic bands of Sum and Difference.",
-            es: "Modulación en Anillo. Multiplicar dos señales crea bandas inarmónicas generadas por la Suma y Diferencia de las frecuencias."
+            pt: "Processo acústico onde duas (ou mais) frequências são multiplicadas, gerando frequências de Soma (A+B) e Diferença (|A-B|). Muito usado na música eletrônica primitiva (Stockhausen) para criar espectros inarmônicos e sons de sinos.",
+            en: "Acoustic process where frequencies are multiplied, generating Sum (A+B) and Difference (|A-B|) frequencies. Widely used in early electronic music to create inharmonic, bell-like spectra.",
+            es: "Proceso donde las frecuencias se multiplican, generando frecuencias de Suma y Diferencia. Muy usado para crear espectros inarmónicos."
         },
         comoUsar: {
-            pt: "Insira duas ou mais portadoras. Gire o botão (Knob) de 'Ordem/Cascata' para retroalimentar o efeito, simulando pedais analógicos que modulam as próprias modulações, gerando densidades extremas.",
-            en: "Insert two or more carriers. Twist the 'Order/Cascade' knob to feedback the effect, simulating analog pedals for extreme densities.",
-            es: "Inserte dos o más portadoras. Gire el Knob de 'Orden/Cascada' para retroalimentar el efecto, generando densidades extremas."
+            pt: "Insira as frequências Portadoras. Ajuste o controle 'Cascata' para definir quantas vezes o som vai se auto-modular (gerando espectros gigantescos) e use o 'Limite' para evitar travamentos do navegador.",
+            en: "Enter Carrier frequencies. Adjust 'Cascade' to define how many times the sound modulates itself, and use 'Limit' to cap the results.",
+            es: "Ingrese las frecuencias Portadoras. Ajuste 'Cascada' para definir la auto-modulación y use 'Límite' para controlar la cantidad de notas."
         }
     },
     {
         id: "tool-fm", type: "tool", toolIndex: 7,
         label: "Síntese FM",
-        color: MARINHO,
-        icon: <path d="M2 12 Q6 2, 10 12 T18 12 T26 12" stroke="white" strokeWidth="2" fill="none" />,
+        color: "#9fdbcf",
+        icon: <path d="M2 12 Q 7 2, 12 12 T 22 12" stroke="white" strokeWidth="2" fill="none" />,
         contexto: {
-            pt: "Inventada por John Chowning, a Modulação de Frequência deforma a onda Portadora (C) na velocidade da Moduladora (M). O resultado é o preenchimento do espectro baseado em Funções Complexas de Bessel, criando os famosos timbres metálicos ou de sinos.",
-            en: "Invented by John Chowning, FM synthesis deforms a Carrier by a Modulator, filling the spectrum based on Bessel Functions for metallic/bell timbres.",
-            es: "Inventada por John Chowning, deforma una Portadora mediante una Moduladora, llenando el espectro para timbres metálicos o de campana."
+            pt: "Síntese por Modulação em Frequência (John Chowning). Uma onda Moduladora altera a frequência de uma Portadora em alta velocidade, gerando bandas laterais matemáticas complexas (Sidebands = C ± kM).",
+            en: "Frequency Modulation Synthesis (John Chowning). A Modulator wave alters a Carrier's frequency at high speeds, generating complex sidebands (C ± kM).",
+            es: "Síntesis por Modulación de Frecuencia. Una onda Moduladora altera una Portadora, generando bandas laterales complejas."
         },
         comoUsar: {
-            pt: "Digite ou puxe um acorde para servir de Portadoras (C). Defina uma única Moduladora (M). Ajuste o botão giratório (Knob) do Índice (K) para alargar ou fechar a árvore de bandas espectrais geradas.",
-            en: "Set Carriers (C) and a Modulator (M). Twist the Index (K) knob to widen or close the tree of generated spectral sidebands.",
-            es: "Defina las Portadoras (C) y la Moduladora (M). Gire el Knob de Índice (K) para ensanchar o cerrar las bandas espectrales."
+            pt: "Defina a Portadora (C) na caixa principal e a Moduladora (M) na caixa menor. Gire o botão 'Índice (K)' para aumentar a energia da modulação, gerando mais harmônicos laterais no resultado.",
+            en: "Set Carrier (C) and Modulator (M). Turn the 'Index (K)' knob to increase modulation energy, generating more sidebands.",
+            es: "Defina la Portadora (C) y la Moduladora (M). Gire el botón 'Índice (K)' para generar más armónicos laterales."
         }
     },
     {
-        id: "tool-additive", type: "tool", toolIndex: 8,
+        id: "tool-add", type: "tool", toolIndex: 8,
         label: "Síntese Aditiva",
-        color: VINHO,
-        icon: <g><rect x="6" y="14" width="3" height="6" fill="white" /><rect x="11" y="10" width="3" height="10" fill="white" /><rect x="16" y="6" width="3" height="14" fill="white" /></g>,
+        color: "#b0b0b0",
+        icon: <path d="M4 12h16M12 4v16" stroke="white" strokeWidth="2" strokeLinecap="round" />,
         contexto: {
-            pt: "A fundação teórica da música Espectral de Gérard Grisey e Tristan Murail. Em vez de subtrair som de um ruído, esculpe-se um timbre fundindo múltiplos osciladores sinusoidais baseados na expansão dos harmônicos naturais.",
-            en: "The theoretical foundation of Spectral music. Sculpts timbres by fusing multiple sine oscillators based on natural harmonic expansion.",
-            es: "La base teórica de la música Espectral. Esculpe timbres fusionando múltiples osciladores sinusoidales basados en la expansión armónica."
+            pt: "Baseada no Teorema de Fourier. A ferramenta projeta a Série Harmônica (projeção otonal / multiplicação) e a Série Sub-Harmônica (projeção utonal / divisão) a partir das frequências fundamentais inseridas.",
+            en: "Based on Fourier's Theorem. Projects the Harmonic Series (otonal / multiplication) and Sub-Harmonic Series (utonal / division) from the fundamental frequencies.",
+            es: "Basada en el Teorema de Fourier. Proyecta la Serie Armónica (otonal) y Sub-Armónica (utonal) desde las frecuencias fundamentales."
         },
         comoUsar: {
-            pt: "Insira a frequência base. Gire os botões de Harmônicos para multiplicar a frequência (gerando o espectro superior) e Sub-harmônicos para dividi-la (espectro inferior). Clique em 'Ouvir' para escutar a síntese final.",
-            en: "Input the base frequency. Turn the Harmonics knob to multiply and Sub-harmonics to divide. Click 'Hear' to listen to the final synthesis.",
-            es: "Ingrese la frecuencia base. Gire los Knobs de Armónicos para multiplicar y Sub-armónicos para dividir. Haga clic en 'Escuchar'."
+            pt: "Insira uma ou mais frequências fundamentais. Use os Knobs para decidir até qual harmônico (para cima) e sub-harmônico (para baixo) o espectro deve ser gerado.",
+            en: "Enter fundamental frequencies. Use the Knobs to decide how many upper harmonics and lower subharmonics should be generated.",
+            es: "Ingrese frecuencias fundamentales. Use los botones para decidir la cantidad de armónicos y sub-armónicos a generar."
         }
     },
     {
         id: "tool-costere-calc", type: "tool", toolIndex: 9,
         label: "Calculadora Costère",
-        color: MARINHO,
-        icon: <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="2" fill="none" strokeDasharray="3 3" />,
+        color: "#ffdd57",
+        icon: <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" fill="none" strokeDasharray="2 4" />,
         contexto: {
-            pt: "Calculadora analítica que extrai a Densidade Cardinal (gravidade acústica) e o Vetor Intervalar (Set-Theory) de uma entidade, revelando o seu DNA harmónico.",
-            en: "Analytical calculator that extracts Cardinal Density and Interval Vector.",
-            es: "Calculadora analítica que extrae la Densidad Cardinal y el Vector Interválico."
+            pt: "Física Acústica e Gravidade. Baseado nas leis matemáticas de Edmond Costère, este algoritmo mede as 'Densidades Cardinais' de um acorde. Ele revela para onde um conjunto de notas 'quer' resolver acusticamente, criando um mapa vetorial de tensão.",
+            en: "Acoustic Physics and Gravity. Based on Edmond Costère's mathematical laws, this algorithm measures 'Cardinal Densities' of a chord, revealing where it acoustically 'wants' to resolve.",
+            es: "Basado en las leyes de Edmond Costère, mide las 'Densidades Cardinales' de un acorde, revelando hacia dónde 'quiere' resolver acústicamente."
         },
         comoUsar: {
-            pt: "Insira os valores da sua entidade base. O sistema calculará instantaneamente as forças de atração em torno de cada uma das 12 notas do total cromático.",
-            en: "Insert your base entity. The system calculates attraction forces around all 12 notes.",
-            es: "Inserte su entidad base. El sistema calcula las fuerzas de atracción de las 12 notas."
+            pt: "Insira qualquer acorde. O painel inferior mostrará o Vetor Intervalar clássico e as Densidades Cardinais. As notas com maiores números (em verde) são os 'centros gravitacionais' para onde aquele acorde aponta.",
+            en: "Enter a chord. The panel shows the Interval Vector and Cardinal Densities. Notes with higher numbers (in green) are the 'gravitational centers' of the chord.",
+            es: "Ingrese un acorde. El panel muestra el Vector Interválico y las Densidades Cardinales. Los números verdes altos son los centros de gravedad."
         }
     },
     {
         id: "tool-costere-interp", type: "tool", toolIndex: 10,
-        label: "Interpolações",
-        color: VINHO,
-        icon: <path d="M4 12 Q 12 2, 20 12" stroke="white" strokeWidth="2" fill="none" markerEnd="url(#arrow)" />,
+        label: "Interpolação & Morphing",
+        color: "#ff6b6b",
+        icon: <path d="M4 12c4-8 12-8 16 0" stroke="white" strokeWidth="2" fill="none" />,
         contexto: {
-            pt: "Motor de morphing que transforma Entidade A em Entidade B. A via Logarítmica assume um caminho espacial cego. A via Costère curva o movimento pelas zonas de maior atração harmónica.",
-            en: "Morphing engine transforming A into B. Logarithmic path is spatial; Costère bends through gravity.",
-            es: "Motor de morphing. La vía Logarítmica es espacial; Costère curva el movimiento por gravedad."
+            pt: "Algoritmos de transição morfológica de materiais sonoros. A Interpolação Logarítmica viaja em linha reta pelo espaço. A Interpolação de Costère viaja puxada pela gravidade acústica, movendo as notas para os pontos de atração do acorde final antes de chegarem ao destino.",
+            en: "Morphological transition algorithms. Logarithmic travels in a straight line. Costère's Interpolation is pulled by acoustic gravity, moving notes towards the final chord's attraction points first.",
+            es: "Algoritmos de transición. Logarítmica viaja en línea recta. Costère viaja tirada por la gravedad acústica hacia el acorde final."
         },
         comoUsar: {
-            pt: "Defina a Entidade A e a Entidade B. Escolha Acorde ou Melodia. Mova o Slider (0% a 100%) para ver, ouvir e exportar cada milissegundo dessa transformação morfológica.",
-            en: "Set A and B. Move the Slider to see, hear, and export the morphing.",
-            es: "Defina A y B. Mueva el Slider para ver, escuchar y exportar el morphing."
+            pt: "Defina a Entidade A (Início) e a Entidade B (Destino). Escolha Acorde ou Melodia, e o algoritmo. Mova o Slider (0% a 100%) para ver, ouvir e exportar cada passo dessa transformação no tempo.",
+            en: "Set A (Start) and B (Destination). Choose Chord or Melody, and the algorithm. Move the Slider to see, hear, and export each step of the morphing.",
+            es: "Defina A (Inicio) y B (Destino). Elija Acorde o Melodía y el algoritmo. Mueva el Slider para ver y escuchar cada paso."
         }
     },
     {
@@ -172,14 +172,14 @@ const codeData = [
         color: "#00ffcc",
         icon: <polygon points="12,2 22,20 2,20" stroke="white" strokeWidth="2" fill="none" strokeLinejoin="round" />,
         contexto: {
-            pt: "O coração da Xenharmonia. O formato Scala (.scl) é o padrão ouro na pesquisa microtonal, permitindo a importação de milhares de afinações históricas, escalas de outras culturas ou temperamentos gerados matematicamente.",
-            en: "The heart of Xenharmony. The Scala format (.scl) is the gold standard in microtonal research.",
-            es: "El corazón de la Xenharmonía. El formato Scala (.scl) es el estándar en la investigación microtonal."
+            pt: "O coração da Xenharmonia. O formato Scala (.scl) é o padrão ouro na pesquisa microtonal, permitindo a importação de milhares de afinações históricas, escalas exóticas ou temperamentos matemáticos contínuos.",
+            en: "The heart of Xenharmony. The Scala format (.scl) is the gold standard in microtonal research, allowing thousands of historical or exotic tunings to be imported.",
+            es: "El corazón de la Xenharmonía. El formato Scala (.scl) es el estándar de oro, permitiendo afinar la aplicación con escalas históricas o exóticas."
         },
         comoUsar: {
-            pt: "Selecione um sistema de Divisão Igual (EDO) como 19, 22 ou 31, ou importe um arquivo .scl. Ao clicar em 'Aplicar', o motor global da aplicação guardará essa afinação como referência.",
-            en: "Select an EDO or import a .scl file. Click 'Apply' to save this tuning as the global reference.",
-            es: "Seleccione un EDO o importe un archivo .scl. Haga clic en 'Aplicar' para guardar esta afinación como referencia global."
+            pt: "Selecione um sistema de Divisão Igual (EDO) como 19, 24 ou 31, ou importe um arquivo .scl do seu PC. Ao clicar em 'Aplicar', o Toggle 'Modo Xenharmônico' será ativado, e todo o áudio e matemática do site passarão a obedecer a essa nova afinação.",
+            en: "Select an EDO or import a .scl file. Click 'Apply' to activate Xenharmonic Mode. All audio and math in the app will now obey this new tuning.",
+            es: "Seleccione un EDO o importe un archivo .scl. Haga clic en 'Aplicar' para activar el Modo Xenharmónico en toda la aplicación."
         }
     }
 ];

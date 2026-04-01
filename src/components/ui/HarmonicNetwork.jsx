@@ -10,57 +10,7 @@ import { parseScalaFile, generateEdoScale } from "../../utils/scalaParser";
 
 const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-// ==========================================
-// FUNÇÕES MATEMÁTICAS E DE FORMATAÇÃO
-// ==========================================
-function midiToNote(midi) {
-    if (midi === undefined || midi === null) return "";
-    const name = noteNames[((Math.round(midi) % 12) + 12) % 12];
-    const oct = Math.floor(Math.round(midi) / 12) - 1;
-    return name + oct;
-}
 
-function hzToMidi(hz) { return hz > 0 ? 69 + 12 * Math.log2(hz / 440) : 0; }
-function midiToHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
-
-function parseAdvancedToHz(str) {
-    if (!str) return [];
-    const parts = str.split(/[,;\s]+/).filter(Boolean);
-    return parts.map(p => {
-        if (p.toLowerCase().endsWith('hz')) return parseFloat(p);
-        let centsOffset = 0, mainPart = p;
-        const cMatch = p.match(/([+-]\d+)c$/i);
-        if (cMatch) { centsOffset = parseInt(cMatch[1]); mainPart = p.replace(cMatch[0], ''); }
-        const noteMatch = mainPart.match(/^([A-G][#b]?)([\+])?(-?\d+)$/i);
-        if (noteMatch) {
-            const nameMap = { "C": 0, "C#": 1, "DB": 1, "D": 2, "D#": 3, "EB": 3, "E": 4, "F": 5, "F#": 6, "GB": 6, "G": 7, "G#": 8, "AB": 8, "A": 9, "A#": 10, "BB": 10, "B": 11 };
-            let m = nameMap[noteMatch[1].toUpperCase()];
-            if (m === undefined) return null;
-            m += (parseInt(noteMatch[3]) + 1) * 12 + (noteMatch[2] === '+' ? 0.5 : 0) + (centsOffset / 100);
-            return midiToHz(m);
-        }
-        const num = parseFloat(mainPart);
-        return isNaN(num) ? null : midiToHz(num);
-    }).filter(n => n !== null);
-}
-
-function formatAllOutput(hzArray) {
-    if (!hzArray || hzArray.length === 0) return { midi: "-", midiCents: "-", hz: "-", notes: "-", quarters: "-" };
-    const midis = hzArray.map(hzToMidi);
-    return {
-        midi: midis.map(m => Math.round(m)).join(', '),
-        midiCents: midis.map(m => `${Math.floor(m)}${Math.round((m % 1) * 100).toString().padStart(2, '0')}c`).join(', '),
-        hz: hzArray.map(hz => `${hz.toFixed(2)}Hz`).join(', '),
-        notes: midis.map(m => {
-            let intM = Math.round(m), c = Math.round((m - intM) * 100);
-            return c === 0 ? midiToNote(intM) : `${midiToNote(intM)}${c > 0 ? '+' : ''}${c}c`;
-        }).join(', '),
-        quarters: midis.map(m => {
-            const mQ = Math.round(m * 2) / 2;
-            return mQ % 1 !== 0 ? `${noteNames[((Math.floor(mQ) % 12) + 12) % 12]}+${Math.floor(Math.floor(mQ) / 12) - 1}` : midiToNote(mQ);
-        }).join(', ')
-    };
-}
 
 const messiaenModes = {
     1: { name: "Modo 1", pcs: [0, 2, 4, 6, 8, 10] },
@@ -176,8 +126,16 @@ const Knob = ({ value, min, max, onChange, label, step = 1 }) => {
     );
 };
 
+// ==========================================
+// PONTEIROS GLOBAIS (Resolve o erro de referência)
+// ==========================================
+let globalHzToMidi = (hz) => 0;
+let globalFormatAllOutput = (arr) => ({ midi: "-", midiCents: "-", hz: "-", notes: "-", quarters: "-" });
+
 const UniversalOutput = ({ hzArray, title = "Resultado", showAudio = true, showMelody = false }) => {
-    const fmt = formatAllOutput(hzArray);
+    // Usa o ponteiro para formatar o resultado
+    const fmt = globalFormatAllOutput(hzArray);
+
     return (
         <div className="bg-gray-950 p-2 rounded border border-gray-700 flex flex-col mt-auto shadow-inner w-full flex-shrink-0">
             <span className="text-[11px] text-green-400 font-bold mb-1 border-b border-gray-800 pb-1 flex justify-between">
@@ -194,12 +152,13 @@ const UniversalOutput = ({ hzArray, title = "Resultado", showAudio = true, showM
                 <div className="flex flex-col gap-1">
                     <div className="flex gap-1">
                         <button onClick={() => playAudio(hzArray, true)} className="w-1/2 bg-green-800 hover:bg-green-700 text-[9px] py-1.5 rounded transition">🎵 Play Acorde</button>
-                        <button onClick={() => exportMIDI(hzArray.map(hzToMidi), false)} className="w-1/2 bg-blue-900 hover:bg-blue-800 text-[9px] py-1.5 rounded transition">Exportar Acorde</button>
+                        {/* Usa o ponteiro para a conversão de exportação */}
+                        <button onClick={() => exportMIDI(hzArray.map(globalHzToMidi), false)} className="w-1/2 bg-blue-900 hover:bg-blue-800 text-[9px] py-1.5 rounded transition">Exportar Acorde</button>
                     </div>
                     {showMelody && (
                         <div className="flex gap-1">
                             <button onClick={() => playAudio(hzArray, false)} className="w-1/2 bg-green-700 hover:bg-green-600 text-[9px] py-1.5 rounded transition">🎵 Play Melodia</button>
-                            <button onClick={() => exportMIDI(hzArray.map(hzToMidi), true)} className="w-1/2 bg-blue-800 hover:bg-blue-700 text-[9px] py-1.5 rounded transition">Exportar Melodia</button>
+                            <button onClick={() => exportMIDI(hzArray.map(globalHzToMidi), true)} className="w-1/2 bg-blue-800 hover:bg-blue-700 text-[9px] py-1.5 rounded transition">Exportar Melodia</button>
                         </div>
                     )}
                 </div>
@@ -319,6 +278,109 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     // Trazendo o Contexto Microtonal Global e Afinações
     const { isMicrotonalMode, toggleMicrotonalMode, activeTuning, setActiveTuning } = useTuning();
 
+    // ==========================================
+    // MOTORES DE FREQUÊNCIA (AGORA GLOBAIS E DINÂMICOS)
+    // ==========================================
+
+    function midiToHz(m) {
+        if (!isMicrotonalMode) return 440 * Math.pow(2, (m - 69) / 12);
+
+        if (activeTuning.type === 'edo') {
+            // Âncora: Dó Central (MIDI 60 = 261.625 Hz)
+            return 261.625565 * Math.pow(2, (m - 60) / activeTuning.divisions);
+        }
+
+        if (activeTuning.type === 'scala' && activeTuning.data) {
+            const scale = activeTuning.data.scale;
+            const scaleLen = scale.length;
+            if (scaleLen === 0) return 261.625565;
+            const periodRatio = scale[scaleLen - 1].ratio;
+
+            const diff = m - 60;
+            const periods = Math.floor(diff / scaleLen);
+            const degree = ((Math.round(diff) % scaleLen) + scaleLen) % scaleLen;
+
+            let ratioWithinPeriod = 1;
+            if (degree > 0) ratioWithinPeriod = scale[degree - 1].ratio;
+
+            return 261.625565 * Math.pow(periodRatio, periods) * ratioWithinPeriod;
+        }
+        return 440 * Math.pow(2, (m - 69) / 12);
+    }
+
+    function hzToMidi(hz) {
+        if (hz <= 0) return 0;
+        if (!isMicrotonalMode) return 69 + 12 * Math.log2(hz / 440);
+
+        if (activeTuning.type === 'edo') {
+            return 60 + activeTuning.divisions * Math.log2(hz / 261.625565);
+        }
+
+        if (activeTuning.type === 'scala' && activeTuning.data) {
+            const scale = activeTuning.data.scale;
+            const scaleLen = scale.length;
+            if (scaleLen === 0) return 60;
+            const periodRatio = scale[scaleLen - 1].ratio;
+
+            const periodsFractional = Math.log(hz / 261.625565) / Math.log(periodRatio);
+            const periods = Math.floor(periodsFractional);
+            const hzWithinPeriod = hz / (261.625565 * Math.pow(periodRatio, periods));
+
+            let closestDegree = 0;
+            let minDiff = Math.abs(hzWithinPeriod - 1);
+
+            for (let i = 0; i < scaleLen; i++) {
+                const diff = Math.abs(hzWithinPeriod - scale[i].ratio);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestDegree = i + 1;
+                }
+            }
+            return 60 + (periods * scaleLen) + closestDegree;
+        }
+        return 69 + 12 * Math.log2(hz / 440);
+    }
+
+    function midiToNote(midi) {
+        if (midi === undefined || midi === null) return "";
+        if (isMicrotonalMode) return `Grau ${Math.round(midi)}`;
+        const name = noteNames[((Math.round(midi) % 12) + 12) % 12];
+        const oct = Math.floor(Math.round(midi) / 12) - 1;
+        return name + oct;
+    }
+
+    function parseAdvancedToHz(str) {
+        if (!str) return [];
+        const parts = str.split(/[,;\s]+/).filter(Boolean);
+        return parts.map(p => {
+            const num = parseFloat(p);
+            if (isNaN(num)) return null;
+            if (p.toLowerCase().includes('hz')) return num;
+            if (p.toLowerCase().includes('c')) return midiToHz(num / 100);
+            return midiToHz(num);
+        }).filter(n => n !== null);
+    }
+
+    function formatAllOutput(hzArray) {
+        if (!hzArray || hzArray.length === 0) return { midi: "-", midiCents: "-", hz: "-", notes: "-", quarters: "-" };
+        const midis = hzArray.map(hzToMidi);
+        return {
+            midi: midis.map(m => Math.round(m)).join(', '),
+            midiCents: midis.map(m => `${Math.floor(m)}${Math.round((m % 1) * 100).toString().padStart(2, '0')}c`).join(', '),
+            hz: hzArray.map(hz => `${hz.toFixed(2)}Hz`).join(', '),
+            notes: midis.map(m => {
+                let intM = Math.round(m), c = Math.round((m - intM) * 100);
+                return c === 0 ? midiToNote(intM) : `${midiToNote(intM)}${c > 0 ? '+' : ''}${c}c`;
+            }).join(', '),
+            quarters: midis.map(m => {
+                if (isMicrotonalMode) return `${m.toFixed(1)} graus`;
+                const mQ = Math.round(m * 2) / 2;
+                return mQ % 1 !== 0 ? `${noteNames[((Math.floor(mQ) % 12) + 12) % 12]}+${Math.floor(Math.floor(mQ) / 12) - 1}` : midiToNote(mQ);
+            }).join(', ')
+        };
+    }
+    globalHzToMidi = hzToMidi;
+    globalFormatAllOutput = formatAllOutput;
     const [baseNote, setBaseNote] = useState(48);
     const [intX, setIntX] = useState(7), [intY, setIntY] = useState(12), [intZ, setIntZ] = useState(4);
     const [selectedSet, setSelectedSet] = useState(new Set()), [showOnlyHighlight, setShowOnlyHighlight] = useState(false), [filterText, setFilterText] = useState("");
@@ -456,10 +518,17 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
     // ABA 9: Calculadora Costère
     const tab9Arr = useMemo(() => parseAdvancedToHz(tab9Input).map(hzToMidi), [tab9Input]);
-    const tab9Analysis = useMemo(() => tab9Arr.length > 0 ? { densities: calculateCardinalDensity(tab9Arr), vector: getIntervalVector(tab9Arr) } : null, [tab9Arr]);
+    const tab9Analysis = useMemo(() => {
+        if (tab9Arr.length === 0) return null;
+        const edo = (isMicrotonalMode && activeTuning.type === 'edo') ? activeTuning.divisions : 12;
+        return {
+            densities: calculateCardinalDensity(tab9Arr, edo),
+            vector: getIntervalVector(tab9Arr, edo)
+        };
+    }, [tab9Arr, isMicrotonalMode, activeTuning]);
     const tab9ResultHz = useMemo(() => tab9Arr.map(midiToHz), [tab9Arr]);
 
-    // ABA 10: Interpolações (Motor Robusto Local para Melodia vs Acorde)
+    // ABA 10: Interpolações (Motor Robusto Local adaptado para Xenharmonia)
     const tab10Frames = useMemo(() => {
         let arrA = parseAdvancedToHz(tab10InputA).map(hzToMidi);
         let arrB = parseAdvancedToHz(tab10InputB).map(hzToMidi);
@@ -469,8 +538,8 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         const steps = tab10StepsCount;
         const frames = [];
         const isMelody = tab10Mode === 'melody';
+        const edo = (isMicrotonalMode && activeTuning.type === 'edo') ? activeTuning.divisions : 12;
 
-        // Pad to same length for geometric morph
         const maxLen = Math.max(arrA.length, arrB.length);
         const a = [...arrA, ...Array(maxLen - arrA.length).fill(arrA[arrA.length - 1] || 60)];
         const b = [...arrB, ...Array(maxLen - arrB.length).fill(arrB[arrB.length - 1] || 60)];
@@ -482,12 +551,22 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                 frames.push(isMelody ? frame : [...new Set(frame)]);
             }
         } else {
-            // Costère: Densidade do alvo
-            const pcsB = b.map(n => ((Math.round(n) % 12) + 12) % 12);
-            const densities = new Array(12).fill(0);
-            for (let i = 0; i < 12; i++) {
+            // Costère com Divisões Dinâmicas (EDO)
+            const pcsB = b.map(n => ((Math.round(n) % edo) + edo) % edo);
+            const densities = new Array(edo).fill(0);
+
+            // O passo que representa a 5ª justa (aprox 702 cents)
+            const fifthStep = Math.round((702 / 1200) * edo);
+
+            for (let i = 0; i < edo; i++) {
                 let score = 0;
-                [i, (i + 7) % 12, (i + 5) % 12, (i + 1) % 12, (i + 11) % 12].forEach(att => {
+                [
+                    i,
+                    (i + fifthStep) % edo,
+                    (i - fifthStep + edo) % edo,
+                    (i + 1) % edo,
+                    (i - 1 + edo) % edo
+                ].forEach(att => {
                     if (pcsB.includes(att)) score++;
                 });
                 densities[i] = score;
@@ -501,12 +580,11 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                 let next = curr.map((note, i) => {
                     if (note === b[i]) return note;
                     const geomTarget = Math.round(a[i] + (b[i] - a[i]) * t);
-                    const pc = ((Math.round(note) % 12) + 12) % 12;
+                    const pc = ((Math.round(note) % edo) + edo) % edo;
 
-                    // Se for uma nota do destino e estiver na vizinhança correta de oitava
-                    if (pcsB.includes(pc) && Math.abs(note - b[i]) < 12) return note + Math.sign(b[i] - note);
+                    if (pcsB.includes(pc) && Math.abs(note - b[i]) < edo) return note + Math.sign(b[i] - note);
 
-                    const upPC = (pc + 1) % 12, downPC = (pc + 11) % 12;
+                    const upPC = (pc + 1) % edo, downPC = (pc - 1 + edo) % edo;
                     const dUp = densities[upPC], dDown = densities[downPC];
                     const bias = Math.sign(geomTarget - note);
 
@@ -517,12 +595,12 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     return note + bias;
                 });
                 curr = next;
-                if (s === steps) curr = [...b]; // Força chegada
+                if (s === steps) curr = [...b];
                 frames.push(isMelody ? [...curr] : [...new Set(curr)]);
             }
         }
         return frames;
-    }, [tab10InputA, tab10InputB, tab10Mode, tab10Algo, tab10StepsCount]);
+    }, [tab10InputA, tab10InputB, tab10Mode, tab10Algo, tab10StepsCount, isMicrotonalMode, activeTuning]);
 
     const tab10ResultHz = useMemo(() => {
         const step = Math.min(tab10Step, tab10Frames.length - 1);
