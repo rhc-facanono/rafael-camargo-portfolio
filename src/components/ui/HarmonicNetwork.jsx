@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from "react";
 import * as THREE from 'three';
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Text, Billboard } from "@react-three/drei";
+import { calculateCardinalDensity, getIntervalVector } from "../../utils/costere";
 
 const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -189,12 +190,12 @@ const UniversalOutput = ({ hzArray, title = "Resultado", showAudio = true, showM
                 <div className="flex flex-col gap-1">
                     <div className="flex gap-1">
                         <button onClick={() => playAudio(hzArray, true)} className="w-1/2 bg-green-800 hover:bg-green-700 text-[9px] py-1.5 rounded transition">🎵 Play Acorde</button>
-                        <button onClick={() => exportMIDI(hzArray.map(hzToMidi), false)} className="w-1/2 bg-blue-900 hover:bg-blue-800 text-[9px] py-1.5 rounded transition">Exportar MIDI do Acorde</button>
+                        <button onClick={() => exportMIDI(hzArray.map(hzToMidi), false)} className="w-1/2 bg-blue-900 hover:bg-blue-800 text-[9px] py-1.5 rounded transition">Exportar Acorde</button>
                     </div>
                     {showMelody && (
                         <div className="flex gap-1">
                             <button onClick={() => playAudio(hzArray, false)} className="w-1/2 bg-green-700 hover:bg-green-600 text-[9px] py-1.5 rounded transition">🎵 Play Melodia</button>
-                            <button onClick={() => exportMIDI(hzArray.map(hzToMidi), true)} className="w-1/2 bg-blue-800 hover:bg-blue-700 text-[9px] py-1.5 rounded transition">Exportar MIDI da Melodia</button>
+                            <button onClick={() => exportMIDI(hzArray.map(hzToMidi), true)} className="w-1/2 bg-blue-800 hover:bg-blue-700 text-[9px] py-1.5 rounded transition">Exportar Melodia</button>
                         </div>
                     )}
                 </div>
@@ -284,7 +285,6 @@ function GrandStaffVisualizer({ notes, isSequence = false, isMicrotonal = false,
                     <text x="15" y="195" fontSize="40" fontFamily="serif" fill="#222" fontWeight="bold">𝄢</text>
                 </svg>
             </div>
-            {/* CORREÇÃO DO SCROLL: min-w-0 resolve o bug do flexbox onde o filho não encolhe */}
             <div className="flex-1 min-w-0 overflow-auto custom-scrollbar" style={{ cursor: onKeyClick ? 'crosshair' : 'default' }}>
                 <svg width={svgWidth} height={svgHeight} style={{ minWidth: `${svgWidth}px`, display: 'block' }} onPointerDown={handleSvgClick}>
                     {[100, 110, 120, 130, 140, 160, 170, 180, 190, 200].map(y => <line key={`line-${y}`} x1="0" y1={y} x2="100%" y2={y} stroke="#333" strokeWidth="1" />)}
@@ -345,7 +345,6 @@ function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, o
                     })}
                 </svg>
             </div>
-            {/* CORREÇÃO DO SCROLL: min-w-0 resolve o bug do flexbox */}
             <div className="flex-1 min-w-0 overflow-auto custom-scrollbar relative" onScroll={handleScroll} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}>
                 <svg width={svgWidth} height={totalHeight} style={{ minWidth: `${svgWidth}px`, display: 'block' }}>
                     {Array.from({ length: maxMidi - minMidi + 1 }).map((_, i) => {
@@ -379,7 +378,19 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     const [tab7Carrier, setTab7Carrier] = useState("440Hz"), [tab7Modulator, setTab7Modulator] = useState("100Hz"), [tab7K, setTab7K] = useState(5);
     const [tab8Input, setTab8Input] = useState(""), [tab8Harmonics, setTab8Harmonics] = useState(4), [tab8Sub, setTab8Sub] = useState(1);
 
+    // ABA 9 - CALCULADORA
+    const [tab9Input, setTab9Input] = useState("60, 64, 67");
+
+    // ABA 10 - INTERPOLAÇÕES
+    const [tab10InputA, setTab10InputA] = useState("60, 64, 67");
+    const [tab10InputB, setTab10InputB] = useState("65, 69, 72");
+    const [tab10Mode, setTab10Mode] = useState("chord"); // "chord" ou "melody"
+    const [tab10Algo, setTab10Algo] = useState("log"); // "log" ou "costere"
+    const [tab10Step, setTab10Step] = useState(0);
+    const [tab10StepsCount, setTab10StepsCount] = useState(20);
+
     const [viewMode, setViewMode] = useState('staff');
+
     const ignoreNextRef = useRef(false), panControlsRef = useRef();
 
     // MOTORES (MEMOIZED)
@@ -469,6 +480,81 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         return Array.from(res).sort((a, b) => a - b);
     }, [tab8Input, tab8Harmonics, tab8Sub]);
 
+    // ABA 9: Calculadora Costère
+    const tab9Arr = useMemo(() => parseAdvancedToHz(tab9Input).map(hzToMidi), [tab9Input]);
+    const tab9Analysis = useMemo(() => tab9Arr.length > 0 ? { densities: calculateCardinalDensity(tab9Arr), vector: getIntervalVector(tab9Arr) } : null, [tab9Arr]);
+    const tab9ResultHz = useMemo(() => tab9Arr.map(midiToHz), [tab9Arr]);
+
+    // ABA 10: Interpolações (Motor Robusto Local para Melodia vs Acorde)
+    const tab10Frames = useMemo(() => {
+        let arrA = parseAdvancedToHz(tab10InputA).map(hzToMidi);
+        let arrB = parseAdvancedToHz(tab10InputB).map(hzToMidi);
+        if (!arrA.length) arrA = [60];
+        if (!arrB.length) arrB = [60];
+
+        const steps = tab10StepsCount;
+        const frames = [];
+        const isMelody = tab10Mode === 'melody';
+
+        // Pad to same length for geometric morph
+        const maxLen = Math.max(arrA.length, arrB.length);
+        const a = [...arrA, ...Array(maxLen - arrA.length).fill(arrA[arrA.length - 1] || 60)];
+        const b = [...arrB, ...Array(maxLen - arrB.length).fill(arrB[arrB.length - 1] || 60)];
+
+        if (tab10Algo === 'log') {
+            for (let s = 0; s <= steps; s++) {
+                const t = s / steps;
+                let frame = a.map((nA, i) => Math.round(nA + (b[i] - nA) * t));
+                frames.push(isMelody ? frame : [...new Set(frame)]);
+            }
+        } else {
+            // Costère: Densidade do alvo
+            const pcsB = b.map(n => ((Math.round(n) % 12) + 12) % 12);
+            const densities = new Array(12).fill(0);
+            for (let i = 0; i < 12; i++) {
+                let score = 0;
+                [i, (i + 7) % 12, (i + 5) % 12, (i + 1) % 12, (i + 11) % 12].forEach(att => {
+                    if (pcsB.includes(att)) score++;
+                });
+                densities[i] = score;
+            }
+
+            let curr = [...a];
+            frames.push(isMelody ? [...curr] : [...new Set(curr)]);
+
+            for (let s = 1; s <= steps; s++) {
+                const t = s / steps;
+                let next = curr.map((note, i) => {
+                    if (note === b[i]) return note;
+                    const geomTarget = Math.round(a[i] + (b[i] - a[i]) * t);
+                    const pc = ((Math.round(note) % 12) + 12) % 12;
+
+                    // Se for uma nota do destino e estiver na vizinhança correta de oitava
+                    if (pcsB.includes(pc) && Math.abs(note - b[i]) < 12) return note + Math.sign(b[i] - note);
+
+                    const upPC = (pc + 1) % 12, downPC = (pc + 11) % 12;
+                    const dUp = densities[upPC], dDown = densities[downPC];
+                    const bias = Math.sign(geomTarget - note);
+
+                    if (bias > 0 && dUp >= dDown) return note + 1;
+                    if (bias < 0 && dDown >= dUp) return note - 1;
+                    if (dUp > dDown) return note + 1;
+                    if (dDown > dUp) return note - 1;
+                    return note + bias;
+                });
+                curr = next;
+                if (s === steps) curr = [...b]; // Força chegada
+                frames.push(isMelody ? [...curr] : [...new Set(curr)]);
+            }
+        }
+        return frames;
+    }, [tab10InputA, tab10InputB, tab10Mode, tab10Algo, tab10StepsCount]);
+
+    const tab10ResultHz = useMemo(() => {
+        const step = Math.min(tab10Step, tab10Frames.length - 1);
+        return tab10Frames[step] ? tab10Frames[step].map(midiToHz) : [];
+    }, [tab10Step, tab10Frames]);
+
     const arrToStr = arr => arr.map(hzToMidi).map(n => n.toFixed(2).replace('.00', '')).join(', ');
 
     // ==========================================
@@ -508,20 +594,6 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         } catch (e) { }
     };
 
-    const handleNormalizeFreqs = () => {
-        let arr = parseAdvancedToHz(tab4Input);
-        if (arr.length > 0) {
-            setTargetMinHz(Math.min(...arr).toFixed(2));
-            setTargetMaxHz(Math.max(...arr).toFixed(2));
-        }
-    };
-
-    const resetDefaults = () => {
-        setBaseNote(48); setIntX(7); setIntY(12); setIntZ(4);
-        setSelectedSet(new Set()); setFilterText(""); setShowOnlyHighlight(false);
-        panControlsRef.current?.resetCamera();
-    };
-
     const PanControls = React.forwardRef(({ ignoreNextRef }, ref) => {
         const { camera } = useThree(); const controlsRef = useRef(); const [isPanning, setIsPanning] = useState(false); const [panStart, setPanStart] = useState([0, 0]);
         React.useImperativeHandle(ref, () => ({ resetCamera: () => { camera.position.set(0, 0, 2.2); if (controlsRef.current) { controlsRef.current.target.set(0, 0, 0); controlsRef.current.update(); } } }));
@@ -539,6 +611,21 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         return <OrbitControls ref={controlsRef} maxDistance={50} minDistance={0.5} enableDamping={false} onPointerDown={handleMouseDown} mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: null }} />;
     });
     const PanControlsSingleton = useMemo(() => <PanControls ignoreNextRef={ignoreNextRef} ref={panControlsRef} />, []);
+
+    // SINCRONIZA AS FERRAMENTAS 9 E 10 COM A REDE 3D
+    useEffect(() => {
+        if (activeTool === 9) {
+            const currentMidis = tab9ResultHz.map(hzToMidi).map(Math.round);
+            const newSet = new Set();
+            points.forEach(pt => { if (currentMidis.includes(Math.round(pt.midi))) newSet.add(pt.coord.join(',')); });
+            setSelectedSet(newSet);
+        } else if (activeTool === 10) {
+            const currentMidis = tab10ResultHz.map(hzToMidi).map(Math.round);
+            const newSet = new Set();
+            points.forEach(pt => { if (currentMidis.includes(Math.round(pt.midi))) newSet.add(pt.coord.join(',')); });
+            setSelectedSet(newSet);
+        }
+    }, [tab9ResultHz, tab10ResultHz, activeTool, points]);
 
     const PullButtons = ({ onPull }) => (
         <div className="flex flex-wrap gap-1 mb-3 border-b border-gray-700 pb-2">
@@ -575,20 +662,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <span className="text-xs text-gray-400 block mb-2">Filtrar (ex: 0,1,-1 a 3,1,-1):</span>
                                     <div className="flex space-x-2 mb-3">
                                         <input type="text" className="flex-1 bg-gray-800 text-xs p-1.5 rounded border border-gray-600" value={filterText} onChange={e => setFilterText(e.target.value)} />
-                                        <button onClick={() => {
-                                            const parts = filterText.split(/\s+a\s+|\s+à\s+|:/);
-                                            try {
-                                                if (parts.length === 1) setSelectedSet(prev => new Set(prev).add(parts[0].trim()));
-                                                else if (parts.length === 2) {
-                                                    const s = parts[0].split(',').map(Number), e = parts[1].split(',').map(Number);
-                                                    const nSet = new Set(selectedSet);
-                                                    for (let x = Math.min(s[0], e[0]); x <= Math.max(s[0], e[0]); x++)
-                                                        for (let y = Math.min(s[1], e[1]); y <= Math.max(s[1], e[1]); y++)
-                                                            for (let z = Math.min(s[2], e[2]); z <= Math.max(s[2], e[2]); z++) nSet.add(`${x},${y},${z}`);
-                                                    setSelectedSet(nSet);
-                                                }
-                                            } catch (err) { }
-                                        }} className="bg-green-600 hover:bg-green-500 px-3 rounded text-xs">Ok</button>
+                                        <button onClick={applyFilter} className="bg-green-600 hover:bg-green-500 px-3 rounded text-xs">Ok</button>
                                     </div>
                                     <label className="flex items-center text-xs cursor-pointer mb-3"><input type="checkbox" className="mr-2" checked={showOnlyHighlight} onChange={e => setShowOnlyHighlight(e.target.checked)} /> Esconder inativas</label>
                                     <div className="flex space-x-2">
@@ -613,6 +687,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     </>
                 )}
 
+                {/* ABA 2: MULTIPLICAÇÃO */}
                 {activeTool === 2 && (
                     <div className="flex w-full h-full bg-gray-800">
                         <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
@@ -635,6 +710,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     </div>
                 )}
 
+                {/* ABA 3: MÓDULOS CÍCLICOS */}
                 {activeTool === 3 && (
                     <div className="flex w-full h-full bg-gray-800">
                         <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
@@ -662,6 +738,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     </div>
                 )}
 
+                {/* ABA 4: PROJEÇÕES PROPORCIONAIS */}
                 {activeTool === 4 && (
                     <div className="flex w-full h-full bg-gray-800">
                         <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
@@ -685,6 +762,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     </div>
                 )}
 
+                {/* ABA 5: MATRIZ DODECAFÔNICA */}
                 {activeTool === 5 && (
                     <div className="flex w-full h-full bg-gray-800">
                         <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
@@ -728,6 +806,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     </div>
                 )}
 
+                {/* ABA 6: RING MODULATION */}
                 {activeTool === 6 && (
                     <div className="flex w-full h-full bg-gray-800">
                         <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
@@ -750,6 +829,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     </div>
                 )}
 
+                {/* ABA 7: FM SYNTHESIS */}
                 {activeTool === 7 && (
                     <div className="flex w-full h-full bg-gray-800">
                         <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
@@ -774,6 +854,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     </div>
                 )}
 
+                {/* ABA 8: ADDITIVE SYNTHESIS */}
                 {activeTool === 8 && (
                     <div className="flex w-full h-full bg-gray-800">
                         <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
@@ -792,6 +873,126 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                 <button onClick={() => setTab8Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
                             </div>
                             {viewMode === 'roll' ? <BachRollVisualizer notes={tab8ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab8Input(prev => prev ? prev + ", " + m : String(m))} /> : <GrandStaffVisualizer notes={tab8ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab8Input(prev => prev ? prev + ", " + m : String(m))} />}
+                        </div>
+                    </div>
+                )}
+
+                {/* ABA 9: CALCULADORA COSTÈRE */}
+                {activeTool === 9 && (
+                    <div className="flex w-full h-full bg-gray-800">
+                        <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
+                            <PullButtons onPull={setTab9Input} />
+                            <label className="text-xs text-gray-400">Coleção para Análise:</label>
+                            <textarea value={tab9Input} onChange={e => setTab9Input(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[60px]" placeholder="Ex: 60, 64, 67" />
+                            <button onClick={() => setTab9Input("")} className="bg-red-900 text-[10px] w-full py-1.5 rounded">Limpar</button>
+
+                            {tab9Analysis && (
+                                <div className="bg-gray-950 p-2 rounded border border-gray-700 flex flex-col space-y-2 mt-2 shadow-inner">
+                                    <span className="text-[10px] text-[#00ffcc] font-bold border-b border-gray-800 pb-1 uppercase">Set-Theory / Costère</span>
+                                    <div className="text-[9px]">
+                                        <span className="text-gray-500 block mb-1">Vetor Intervalar (1 a 6 semitons):</span>
+                                        <span className="text-gray-300 font-mono bg-gray-800 p-1 rounded block text-center border border-gray-700">[{tab9Analysis.vector.join(', ')}]</span>
+                                    </div>
+                                    <div className="text-[9px] mt-1">
+                                        <span className="text-gray-500 block mb-1">Densidades Cardinais (Gravidade):</span>
+                                        <div className="grid grid-cols-6 gap-1 mt-1 text-center font-mono">
+                                            {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map((note, i) => (
+                                                <div key={i} className="bg-gray-800 rounded border border-gray-700 pt-0.5 pb-1">
+                                                    <div className="text-gray-500 text-[7px]">{note}</div>
+                                                    <div className={`text-[10px] ${tab9Analysis.densities[i] > 2 ? 'text-green-400 font-bold' : 'text-gray-300'}`}>{tab9Analysis.densities[i]}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            <UniversalOutput hzArray={tab9ResultHz} title="Entidade Atual" isSimultaneous={true} showMelody={true} />
+                        </div>
+                        <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col relative">
+                            <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
+                                <Canvas camera={{ position: [0, 0, 2.2], fov: 60 }}>
+                                    <ambientLight />{PanControlsSingleton}<GridLines showOnlyHighlight={true} selectedSet={selectedSet} />
+                                    {points.map((pt, idx) => {
+                                        const isSel = selectedSet.has(pt.coord.join(','));
+                                        return <NotePoint key={idx} pt={pt} selectedSet={selectedSet} toggleSelect={() => { }} blendedHue={(pt.coord[0] + 7) / 14 * 360 * 0.75 + (pt.coord[2] + 2) / 4 * 120 * 0.25} isSel={isSel} ignoreNextRef={ignoreNextRef} customOpacity={isSel ? 0.9 : 0.03} textOpacity={isSel ? 1 : 0.05} />;
+                                    })}
+                                </Canvas>
+                            </div>
+                            <div className="relative z-10 flex flex-col h-full">
+                                <div className="flex justify-between items-center mb-2">
+                                    <VisualizerToggle viewMode={viewMode} setViewMode={setViewMode} themeColor={themeColor} />
+                                    <button onClick={() => setTab9Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                </div>
+                                <div className="flex-1 shadow-2xl rounded overflow-hidden border border-gray-700 bg-gray-900 bg-opacity-90 backdrop-blur-sm">
+                                    {viewMode === 'roll' ?
+                                        <BachRollVisualizer notes={tab9ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={false} onKeyClick={m => setTab9Input(prev => prev ? prev + ", " + m : String(m))} /> :
+                                        <GrandStaffVisualizer notes={tab9ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={false} onKeyClick={m => setTab9Input(prev => prev ? prev + ", " + m : String(m))} />}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ABA 10: INTERPOLAÇÕES */}
+                {activeTool === 10 && (
+                    <div className="flex w-full h-full bg-gray-800">
+                        <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
+                            <PullButtons onPull={setTab10InputA} />
+
+                            <div className="flex flex-col space-y-2">
+                                <div className="flex bg-gray-800 rounded border border-gray-600 overflow-hidden">
+                                    <button onClick={() => setTab10Mode('chord')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab10Mode === 'chord' ? 'bg-purple-700 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Acorde</button>
+                                    <button onClick={() => setTab10Mode('melody')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab10Mode === 'melody' ? 'bg-purple-700 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Melodia</button>
+                                </div>
+                                <div className="flex bg-gray-800 rounded border border-gray-600 overflow-hidden">
+                                    <button onClick={() => setTab10Algo('log')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab10Algo === 'log' ? 'bg-blue-700 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Logarítmica</button>
+                                    <button onClick={() => setTab10Algo('costere')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab10Algo === 'costere' ? 'bg-blue-700 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Costère</button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 mt-2">
+                                <label className="text-[10px] text-gray-400">Entidade A (Início):</label>
+                                <textarea value={tab10InputA} onChange={e => setTab10InputA(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[50px]" placeholder="Ex: 60, 64, 67" />
+                                <label className="text-[10px] text-gray-400">Entidade B (Destino):</label>
+                                <textarea value={tab10InputB} onChange={e => setTab10InputB(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[50px]" placeholder="Ex: 65, 69, 72" />
+                            </div>
+
+                            <div className="border-t border-gray-700 pt-3 pb-1">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase">Morphing</span>
+                                    <span className="text-xs text-[#00ffcc] font-mono font-bold">{Math.round((tab10Step / tab10StepsCount) * 100)}%</span>
+                                </div>
+                                <input type="range" min="0" max={tab10StepsCount} value={tab10Step} onChange={(e) => setTab10Step(Number(e.target.value))} className="w-full accent-blue-500 cursor-pointer" />
+                                <div className="flex justify-between text-[8px] text-gray-500 mt-1"><span>A</span><span>B</span></div>
+                            </div>
+
+                            <UniversalOutput hzArray={tab10ResultHz} title="Frame Atual" isSimultaneous={tab10Mode === 'chord'} showMelody={tab10Mode === 'melody'} />
+                        </div>
+
+                        <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col relative">
+                            <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
+                                <Canvas camera={{ position: [0, 0, 2.2], fov: 60 }}>
+                                    <ambientLight />{PanControlsSingleton}<GridLines showOnlyHighlight={true} selectedSet={selectedSet} />
+                                    {points.map((pt, idx) => {
+                                        const isSel = selectedSet.has(pt.coord.join(','));
+                                        return <NotePoint key={idx} pt={pt} selectedSet={selectedSet} toggleSelect={() => { }} blendedHue={(pt.coord[0] + 7) / 14 * 360 * 0.75 + (pt.coord[2] + 2) / 4 * 120 * 0.25} isSel={isSel} ignoreNextRef={ignoreNextRef} customOpacity={isSel ? 0.9 : 0.03} textOpacity={isSel ? 1 : 0.05} />;
+                                    })}
+                                </Canvas>
+                            </div>
+
+                            <div className="relative z-10 flex flex-col h-full">
+                                <div className="flex justify-between items-center mb-2">
+                                    <VisualizerToggle viewMode={viewMode} setViewMode={setViewMode} themeColor={themeColor} />
+                                    <button onClick={() => { setTab10InputA(""); setTab10InputB(""); setTab10Step(0); }} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2 shadow">Limpar Tudo</button>
+                                </div>
+
+                                <div className="flex-1 shadow-2xl rounded overflow-hidden border border-gray-700 bg-gray-900 bg-opacity-90 backdrop-blur-sm">
+                                    {viewMode === 'roll' ?
+                                        <BachRollVisualizer notes={tab10ResultHz.map(hzToMidi)} isSequence={tab10Mode === 'melody'} isMicrotonal={false} onKeyClick={m => setTab10InputA(prev => prev ? prev + ", " + m : String(m))} /> :
+                                        <GrandStaffVisualizer notes={tab10ResultHz.map(hzToMidi)} isSequence={tab10Mode === 'melody'} isMicrotonal={false} onKeyClick={m => setTab10InputA(prev => prev ? prev + ", " + m : String(m))} />
+                                    }
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

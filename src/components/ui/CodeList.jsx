@@ -133,6 +133,38 @@ const codeData = [
             en: "Input the base frequency. Turn the Harmonics knob to multiply and Sub-harmonics to divide. Click 'Hear' to listen to the final synthesis.",
             es: "Ingrese la frecuencia base. Gire los Knobs de Armónicos para multiplicar y Sub-armónicos para dividir. Haga clic en 'Escuchar'."
         }
+    },
+    {
+        id: "tool-costere-calc", type: "tool", toolIndex: 9,
+        label: "Calculadora Costère",
+        color: MARINHO,
+        icon: <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="2" fill="none" strokeDasharray="3 3" />,
+        contexto: {
+            pt: "Calculadora analítica que extrai a Densidade Cardinal (gravidade acústica) e o Vetor Intervalar (Set-Theory) de uma entidade, revelando o seu DNA harmónico.",
+            en: "Analytical calculator that extracts Cardinal Density and Interval Vector.",
+            es: "Calculadora analítica que extrae la Densidad Cardinal y el Vector Interválico."
+        },
+        comoUsar: {
+            pt: "Insira os valores da sua entidade base. O sistema calculará instantaneamente as forças de atração em torno de cada uma das 12 notas do total cromático.",
+            en: "Insert your base entity. The system calculates attraction forces around all 12 notes.",
+            es: "Inserte su entidad base. El sistema calcula las fuerzas de atracción de las 12 notas."
+        }
+    },
+    {
+        id: "tool-costere-interp", type: "tool", toolIndex: 10,
+        label: "Interpolações",
+        color: VINHO,
+        icon: <path d="M4 12 Q 12 2, 20 12" stroke="white" strokeWidth="2" fill="none" markerEnd="url(#arrow)" />,
+        contexto: {
+            pt: "Motor de morphing que transforma Entidade A em Entidade B. A via Logarítmica assume um caminho espacial cego. A via Costère curva o movimento pelas zonas de maior atração harmónica.",
+            en: "Morphing engine transforming A into B. Logarithmic path is spatial; Costère bends through gravity.",
+            es: "Motor de morphing. La vía Logarítmica es espacial; Costère curva el movimiento por gravedad."
+        },
+        comoUsar: {
+            pt: "Defina a Entidade A e a Entidade B. Escolha Acorde ou Melodia. Mova o Slider (0% a 100%) para ver, ouvir e exportar cada milissegundo dessa transformação morfológica.",
+            en: "Set A and B. Move the Slider to see, hear, and export the morphing.",
+            es: "Defina A y B. Mueva el Slider para ver, escuchar y exportar el morphing."
+        }
     }
 ];
 
