@@ -3,6 +3,9 @@ import * as THREE from 'three';
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Text, Billboard } from "@react-three/drei";
 import { calculateCardinalDensity, getIntervalVector } from "../../utils/costere";
+import { useTuning } from "../../context/TuningContext";
+import GrandStaffVisualizer from "../visualizers/GrandStaffVisualizer";
+import StaffToolbar from "../visualizers/StaffToolbar";
 
 const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -254,60 +257,6 @@ function NotePoint({ pt, selectedSet, toggleSelect, blendedHue, isSel, ignoreNex
     );
 }
 
-function GrandStaffVisualizer({ notes, isSequence = false, isMicrotonal = false, onKeyClick = null }) {
-    const xMultiplier = isSequence ? 40 : 14;
-    const svgWidth = Math.max(800, 60 + notes.length * xMultiplier + 100);
-    const svgHeight = 300, lineSpacing = 10, baseY = 150;
-
-    const handleSvgClick = (e) => {
-        if (!onKeyClick || !(e.ctrlKey || e.metaKey)) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const step = Math.round((baseY - (e.clientY - rect.top)) / (lineSpacing / 2));
-        const oct = Math.floor(step / 7) + 4;
-        const pcStep = ((step % 7) + 7) % 7;
-        const diatonicToMidi = [0, 2, 4, 5, 7, 9, 11];
-        onKeyClick((oct + 1) * 12 + diatonicToMidi[pcStep]);
-    };
-
-    const getDiatonicInfo = (midi) => {
-        const pc = Math.round(midi) % 12, oct = Math.floor(midi / 12) - 1;
-        const diatonicMap = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
-        const accidentalMap = ['', '#', '', '#', '', '', '#', '', '#', '', '#', ''];
-        return { step: diatonicMap[pc] + (oct - 4) * 7, acc: (midi % 1 !== 0) ? '+' : accidentalMap[pc] };
-    };
-
-    return (
-        <div className="flex w-full h-full bg-[#f8f9fa] border border-gray-700 rounded overflow-hidden relative shadow-inner">
-            <div className="w-[60px] flex-shrink-0 bg-[#f8f9fa] border-r border-gray-300 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
-                <svg width="60" height={svgHeight} className="w-full h-full">
-                    {[100, 110, 120, 130, 140, 160, 170, 180, 190, 200].map(y => <line key={`fix-${y}`} x1="0" y1={y} x2="100%" y2={y} stroke="#333" strokeWidth="1" />)}
-                    <text x="15" y="135" fontSize="40" fontFamily="serif" fill="#222" fontWeight="bold">𝄞</text>
-                    <text x="15" y="195" fontSize="40" fontFamily="serif" fill="#222" fontWeight="bold">𝄢</text>
-                </svg>
-            </div>
-            <div className="flex-1 min-w-0 overflow-auto custom-scrollbar" style={{ cursor: onKeyClick ? 'crosshair' : 'default' }}>
-                <svg width={svgWidth} height={svgHeight} style={{ minWidth: `${svgWidth}px`, display: 'block' }} onPointerDown={handleSvgClick}>
-                    {[100, 110, 120, 130, 140, 160, 170, 180, 190, 200].map(y => <line key={`line-${y}`} x1="0" y1={y} x2="100%" y2={y} stroke="#333" strokeWidth="1" />)}
-                    {notes.map((midi, idx) => {
-                        const info = getDiatonicInfo(midi), y = baseY - (info.step * (lineSpacing / 2)), x = 20 + (idx * xMultiplier);
-                        const ledgers = [];
-                        if (y <= 90) { for (let l = 90; l >= y; l -= 10) ledgers.push(l); }
-                        if (y === 150) ledgers.push(150);
-                        if (y >= 210) { for (let l = 210; l <= y; l += 10) ledgers.push(l); }
-                        return (
-                            <g key={`note-${idx}`}>
-                                {ledgers.map(ly => <line key={`l-${idx}-${ly}`} x1={x - 12} y1={ly} x2={x + 12} y2={ly} stroke="#333" strokeWidth="1.5" />)}
-                                {info.acc && <text x={x - 16} y={y + 4} fontSize="14" fill="#222" fontWeight="bold">{info.acc}</text>}
-                                <ellipse cx={x} cy={y} rx="7" ry="5" fill={isMicrotonal ? "#c0392b" : "#2980b9"} transform={`rotate(-15 ${x} ${y})`} />
-                                {isMicrotonal && <text x={x - 5} y={y - 12} fontSize="9" fill="#c0392b" fontWeight="bold">{midi.toFixed(1)}</text>}
-                            </g>
-                        );
-                    })}
-                </svg>
-            </div>
-        </div>
-    );
-}
 
 function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, onKeyClick = null, onNoteDrag = null, onNoteDelete = null, originalEntityLength = 0 }) {
     const minMidi = 36, maxMidi = 96, rowHeight = 14, totalHeight = (maxMidi - minMidi + 1) * rowHeight;
@@ -366,6 +315,9 @@ function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, o
 // COMPONENTE EXPORTADO PRINCIPAL
 // ==========================================
 export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a" }) {
+    // Trazendo o Contexto Microtonal Global
+    const { isMicrotonalMode, toggleMicrotonalMode } = useTuning();
+
     const [baseNote, setBaseNote] = useState(48);
     const [intX, setIntX] = useState(7), [intY, setIntY] = useState(12), [intZ, setIntZ] = useState(4);
     const [selectedSet, setSelectedSet] = useState(new Set()), [showOnlyHighlight, setShowOnlyHighlight] = useState(false), [filterText, setFilterText] = useState("");
@@ -653,9 +605,18 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                         </select>
                                     </label>
                                     <div className="grid grid-cols-3 gap-2">
-                                        <label className="flex flex-col text-[10px] text-gray-400">X (5as): <input className="mt-1 bg-gray-800 p-1 text-center rounded" type="number" value={intX} onChange={e => setIntX(Number(e.target.value))} /></label>
-                                        <label className="flex flex-col text-[10px] text-gray-400">Y (8as): <input className="mt-1 bg-gray-800 p-1 text-center rounded" type="number" value={intY} onChange={e => setIntY(Number(e.target.value))} /></label>
-                                        <label className="flex flex-col text-[10px] text-gray-400">Z (3as): <input className="mt-1 bg-gray-800 p-1 text-center rounded" type="number" value={intZ} onChange={e => setIntZ(Number(e.target.value))} /></label>
+                                        <label className="flex flex-col text-[10px] text-gray-400">
+                                            {isMicrotonalMode ? 'X (Cents):' : 'X (5as):'}
+                                            <input className="mt-1 bg-gray-800 p-1 text-center rounded" type="number" step="any" value={intX} onChange={e => setIntX(parseFloat(e.target.value) || 0)} />
+                                        </label>
+                                        <label className="flex flex-col text-[10px] text-gray-400">
+                                            {isMicrotonalMode ? 'Y (Cents):' : 'Y (8as):'}
+                                            <input className="mt-1 bg-gray-800 p-1 text-center rounded" type="number" step="any" value={intY} onChange={e => setIntY(parseFloat(e.target.value) || 0)} />
+                                        </label>
+                                        <label className="flex flex-col text-[10px] text-gray-400">
+                                            {isMicrotonalMode ? 'Z (Cents):' : 'Z (3as):'}
+                                            <input className="mt-1 bg-gray-800 p-1 text-center rounded" type="number" step="any" value={intZ} onChange={e => setIntZ(parseFloat(e.target.value) || 0)} />
+                                        </label>
                                     </div>
                                 </div>
                                 <div className="pt-3 border-t border-gray-600">
@@ -703,7 +664,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
                             <div className="flex justify-between items-center mb-2">
                                 <VisualizerToggle viewMode={viewMode} setViewMode={setViewMode} themeColor={themeColor} />
-                                <button onClick={() => setTab2InputA("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado (A)</button>
+                                <div className="flex items-center gap-2">
+                                    {viewMode === 'staff' && <StaffToolbar />}
+                                    <button onClick={() => setTab2InputA("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado (A)</button>
+                                </div>
                             </div>
                             {viewMode === 'roll' ? <BachRollVisualizer notes={tab2ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={tab2NonTemp} onKeyClick={m => setTab2InputA(prev => prev ? prev + ", " + m : String(m))} /> : <GrandStaffVisualizer notes={tab2ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={tab2NonTemp} onKeyClick={m => setTab2InputA(prev => prev ? prev + ", " + m : String(m))} />}
                         </div>
