@@ -348,13 +348,29 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     // MOTORES (MEMOIZED)
     const points = useMemo(() => {
         const arr = [];
+        // Se estivermos no modo microtonal, convertemos os cents para a escala decimal do MIDI (dividindo por 100)
+        const stepX = isMicrotonalMode ? intX / 100 : intX;
+        const stepY = isMicrotonalMode ? intY / 100 : intY;
+        const stepZ = isMicrotonalMode ? intZ / 100 : intZ;
+
         for (let x = -7; x <= 7; x++) {
             for (let y = -2; y <= 2; y++) {
-                for (let z = -2; z <= 2; z++) arr.push({ coord: [x, y, z], position: [x * 1.5, y * 2, z * 2.5], note: midiToNote(baseNote + x * intX + y * intY + z * intZ), midi: baseNote + x * intX + y * intY + z * intZ });
+                for (let z = -2; z <= 2; z++) {
+                    const midiVal = baseNote + (x * stepX) + (y * stepY) + (z * stepZ);
+                    // Se for microtonal, mostra o valor exato em vez do nome da nota arredondada
+                    const noteLabel = isMicrotonalMode ? midiVal.toFixed(2) : midiToNote(midiVal);
+
+                    arr.push({
+                        coord: [x, y, z],
+                        position: [x * 1.5, y * 2, z * 2.5],
+                        note: noteLabel,
+                        midi: midiVal
+                    });
+                }
             }
         }
         return arr;
-    }, [baseNote, intX, intY, intZ]);
+    }, [baseNote, intX, intY, intZ, isMicrotonalMode]);
 
     const tab1Hz = useMemo(() => points.filter(pt => selectedSet.has(pt.coord.join(','))).map(pt => midiToHz(pt.midi)).sort((a, b) => a - b), [points, selectedSet]);
 
@@ -591,6 +607,20 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
     return (
         <div className="w-full h-full relative flex flex-col bg-gray-950 font-sans text-white">
+
+            {/* NOSSO NOVO BOTÃO MASTER TOGGLE */}
+            <div className="absolute top-4 right-4 z-50 flex items-center gap-2 bg-gray-900 p-2 rounded-lg border border-gray-700 shadow-xl">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    {isMicrotonalMode ? 'Modo Xenharmônico' : 'Modo 12-TET'}
+                </span>
+                <button
+                    onClick={toggleMicrotonalMode}
+                    className={`w-10 h-5 rounded-full p-1 transition-colors ${isMicrotonalMode ? 'bg-[#00ffcc]' : 'bg-gray-600'}`}
+                >
+                    <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${isMicrotonalMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                </button>
+            </div>
+
             <div className="flex-1 relative flex overflow-hidden">
 
                 {/* ABA 1: REDES */}
@@ -695,7 +725,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
                             <div className="flex justify-between items-center mb-2">
                                 <VisualizerToggle viewMode={viewMode} setViewMode={setViewMode} themeColor={themeColor} />
-                                <button onClick={() => setTab3Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                <div className="flex items-center gap-2">
+                                    {viewMode === 'staff' && <StaffToolbar />}
+                                    <button onClick={() => setTab3Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                </div>
                             </div>
                             {viewMode === 'roll' ? <BachRollVisualizer notes={tab3ResultHz.map(hzToMidi)} isSequence={true} onKeyClick={m => setTab3Input(prev => prev ? prev + ", " + m : String(m))} onNoteDrag={(idx, m) => { let a = [...tab3ParsedInput]; if (idx < a.length) { a[idx] = m; setTab3Input(a.join(', ')); } }} originalEntityLength={tab3ParsedInput.length} onNoteDelete={(idx) => { let a = [...tab3ParsedInput]; if (idx < a.length) { a.splice(idx, 1); setTab3Input(a.join(', ')); } }} /> : <GrandStaffVisualizer notes={tab3ResultHz.map(hzToMidi)} isSequence={true} onKeyClick={m => setTab3Input(prev => prev ? prev + ", " + m : String(m))} />}
                         </div>
@@ -719,7 +752,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
                             <div className="flex justify-between items-center mb-2">
                                 <VisualizerToggle viewMode={viewMode} setViewMode={setViewMode} themeColor={themeColor} />
-                                <button onClick={() => setTab4Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                <div className="flex items-center gap-2">
+                                    {viewMode === 'staff' && <StaffToolbar />}
+                                    <button onClick={() => setTab4Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                </div>
                             </div>
                             {viewMode === 'roll' ? <BachRollVisualizer notes={tab4MidiEquivalents} isSequence={true} isMicrotonal={true} onKeyClick={m => setTab4Input(prev => prev ? prev + ", " + m : String(m))} onNoteDelete={(idx) => { let a = parseAdvancedToHz(tab4Input).map(hzToMidi); if (idx < a.length) { a.splice(idx, 1); setTab4Input(a.join(', ')); } }} /> : <GrandStaffVisualizer notes={tab4MidiEquivalents} isSequence={true} isMicrotonal={true} onKeyClick={m => setTab4Input(prev => prev ? prev + ", " + m : String(m))} />}
                         </div>
@@ -786,7 +822,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
                             <div className="flex justify-between items-center mb-2">
                                 <VisualizerToggle viewMode={viewMode} setViewMode={setViewMode} themeColor={themeColor} />
-                                <button onClick={() => setTab6Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                <div className="flex items-center gap-2">
+                                    {viewMode === 'staff' && <StaffToolbar />}
+                                    <button onClick={() => setTab6Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                </div>
                             </div>
                             {viewMode === 'roll' ? <BachRollVisualizer notes={tab6ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab6Input(prev => prev ? prev + ", " + m : String(m))} /> : <GrandStaffVisualizer notes={tab6ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab6Input(prev => prev ? prev + ", " + m : String(m))} />}
                         </div>
@@ -811,7 +850,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
                             <div className="flex justify-between items-center mb-2">
                                 <VisualizerToggle viewMode={viewMode} setViewMode={setViewMode} themeColor={themeColor} />
-                                <button onClick={() => setTab7Carrier("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado (C)</button>
+                                <div className="flex items-center gap-2">
+                                    {viewMode === 'staff' && <StaffToolbar />}
+                                    <button onClick={() => setTab7Carrier("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado (C)</button>
+                                </div>
                             </div>
                             {viewMode === 'roll' ? <BachRollVisualizer notes={tab7ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab7Carrier(prev => prev ? prev + ", " + m : String(m))} /> : <GrandStaffVisualizer notes={tab7ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab7Carrier(prev => prev ? prev + ", " + m : String(m))} />}
                         </div>
@@ -834,7 +876,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
                             <div className="flex justify-between items-center mb-2">
                                 <VisualizerToggle viewMode={viewMode} setViewMode={setViewMode} themeColor={themeColor} />
-                                <button onClick={() => setTab8Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                <div className="flex items-center gap-2">
+                                    {viewMode === 'staff' && <StaffToolbar />}
+                                    <button onClick={() => setTab8Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                </div>
                             </div>
                             {viewMode === 'roll' ? <BachRollVisualizer notes={tab8ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab8Input(prev => prev ? prev + ", " + m : String(m))} /> : <GrandStaffVisualizer notes={tab8ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab8Input(prev => prev ? prev + ", " + m : String(m))} />}
                         </div>
