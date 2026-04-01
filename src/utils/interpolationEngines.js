@@ -1,5 +1,5 @@
 // src/utils/interpolationEngines.js
-import { calculateCardinalDensity } from './costereMath';
+import { calculateCardinalDensity } from './costere';
 
 // Interpolação Logarítmica (Matemática/Espacial Reta)
 // Faz uma transição linear simples entre a Coleção A e a Coleção B
@@ -15,7 +15,7 @@ export function interpolateLogarithmic(collectionA, collectionB, steps = 10) {
         const t = step / steps;
         const currentFrame = a.map((noteA, index) => {
             const noteB = b[index];
-            // Interpolação linear simples (arredondada para a nota mais próxima)
+            // Interpolação linear simples (arredondada para o passo mais próximo)
             return Math.round(noteA + (noteB - noteA) * t);
         });
         frames.push([...new Set(currentFrame)]); // Remove duplicatas
@@ -23,10 +23,10 @@ export function interpolateLogarithmic(collectionA, collectionB, steps = 10) {
     return frames;
 }
 
-// Interpolação de Costère (Gravitacional)
-// As notas são "puxadas" em direção aos pontos de maior densidade do Acorde/Melodia alvo
-export function interpolateCostere(collectionA, collectionB, steps = 10) {
-    const targetDensities = calculateCardinalDensity(collectionB);
+// Interpolação de Costère (Gravitacional) adaptada para EDOs
+// As notas são "puxadas" em direção aos pontos de maior densidade do alvo
+export function interpolateCostere(collectionA, collectionB, steps = 10, edoDivisions = 12) {
+    const targetDensities = calculateCardinalDensity(collectionB, edoDivisions);
     const frames = [];
 
     let currentCollection = [...collectionA];
@@ -36,9 +36,9 @@ export function interpolateCostere(collectionA, collectionB, steps = 10) {
         const nextCollection = currentCollection.map(note => {
             if (collectionB.includes(note)) return note; // Já chegou no alvo
 
-            // Procura vizinhos (acima ou abaixo) e move para o que tem maior densidade cardinal
-            const up = (note + 1) % 12;
-            const down = (note + 11) % 12;
+            // Procura vizinhos no sistema de afinação (acima ou abaixo)
+            const up = ((note + 1) % edoDivisions + edoDivisions) % edoDivisions;
+            const down = ((note - 1) % edoDivisions + edoDivisions) % edoDivisions;
 
             if (targetDensities[up] > targetDensities[down]) {
                 return note + 1; // Puxado para cima
