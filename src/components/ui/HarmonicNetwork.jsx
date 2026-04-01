@@ -48,11 +48,11 @@ function formatAllOutput(hzArray) {
     const midis = hzArray.map(hzToMidi);
     return {
         midi: midis.map(m => Math.round(m)).join(', '),
-        midiCents: midis.map(m => `${Math.floor(m)}${Math.round((m % 1) * 100).toString().padStart(2, '0')}`).join(', '),
-        hz: hzArray.map(hz => hz.toFixed(2)).join(', '),
+        midiCents: midis.map(m => `${Math.floor(m)}${Math.round((m % 1) * 100).toString().padStart(2, '0')}c`).join(', '),
+        hz: hzArray.map(hz => `${hz.toFixed(2)}Hz`).join(', '),
         notes: midis.map(m => {
             let intM = Math.round(m), c = Math.round((m - intM) * 100);
-            return c === 0 ? midiToNote(intM) : `${midiToNote(intM)} ${c > 0 ? '+' : ''}${c}c`;
+            return c === 0 ? midiToNote(intM) : `${midiToNote(intM)}${c > 0 ? '+' : ''}${c}c`;
         }).join(', '),
         quarters: midis.map(m => {
             const mQ = Math.round(m * 2) / 2;
@@ -594,7 +594,59 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             setSelectedSet(newSet);
         }
     }, [tab9ResultHz, tab10ResultHz, activeTool, points]);
+    // ATALHO DE TECLADO: Alt + Setas para mover a última nota inserida
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                e.preventDefault();
 
+                // Mapeia qual input de texto estamos editando baseado na aba ativa
+                const tabInputMap = {
+                    2: { val: tab2InputA, set: setTab2InputA },
+                    3: { val: tab3Input, set: setTab3Input },
+                    4: { val: tab4Input, set: setTab4Input },
+                    5: { val: tab5Input, set: setTab5Input },
+                    6: { val: tab6Input, set: setTab6Input },
+                    7: { val: tab7Carrier, set: setTab7Carrier },
+                    8: { val: tab8Input, set: setTab8Input },
+                    9: { val: tab9Input, set: setTab9Input },
+                    10: { val: tab10InputA, set: setTab10InputA },
+                };
+
+                const current = tabInputMap[activeTool];
+                if (!current || !current.val) return;
+
+                // Pega a última nota da string (ex: "60, 64Hz" -> "64Hz")
+                let parts = current.val.split(',').map(s => s.trim());
+                if (parts.length === 0 || parts[0] === "") return;
+
+                let lastPart = parts[parts.length - 1];
+
+                // Extrai apenas os números (permite decimais e negativos)
+                let match = lastPart.match(/-?\d+(\.\d+)?/);
+                if (!match) return;
+
+                let numVal = parseFloat(match[0]);
+                let suffix = lastPart.replace(match[0], ''); // Guarda "Hz", "c", etc.
+
+                // Sobe ou desce 1 unidade
+                const step = e.key === 'ArrowUp' ? 1 : -1;
+                let newVal = numVal + step;
+
+                // Formata o número final
+                let newValStr = Number.isInteger(newVal) ? newVal.toString() : newVal.toFixed(2);
+
+                parts[parts.length - 1] = newValStr + suffix;
+                current.set(parts.join(', '));
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeTool, tab2InputA, tab3Input, tab4Input, tab5Input, tab6Input, tab7Carrier, tab8Input, tab9Input, tab10InputA]);
+
+    // RESTAURANDO OS BOTÕES DE PUXAR:
     const PullButtons = ({ onPull }) => (
         <div className="flex flex-wrap gap-1 mb-3 border-b border-gray-700 pb-2">
             <span className="text-[10px] text-gray-500 mr-1 mt-1">Puxar de:</span>
@@ -608,9 +660,9 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     return (
         <div className="w-full h-full relative flex flex-col bg-gray-950 font-sans text-white">
 
-            {/* NOSSO NOVO BOTÃO MASTER TOGGLE */}
-            <div className="absolute top-4 right-4 z-50 flex items-center gap-2 bg-gray-900 p-2 rounded-lg border border-gray-700 shadow-xl">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            {/* BARRA GLOBAL SUPERIOR: Fica fora do caminho de tudo */}
+            <div className="w-full bg-gray-900 border-b border-gray-700 p-2 flex justify-end items-center z-50 shadow-md">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-2">
                     {isMicrotonalMode ? 'Modo Xenharmônico' : 'Modo 12-TET'}
                 </span>
                 <button
@@ -930,7 +982,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                             <div className="relative z-10 flex flex-col h-full">
                                 <div className="flex justify-between items-center mb-2">
                                     <VisualizerToggle viewMode={viewMode} setViewMode={setViewMode} themeColor={themeColor} />
-                                    <button onClick={() => setTab9Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                    <div className="flex items-center gap-2">
+                                        {viewMode === 'staff' && <StaffToolbar />}
+                                        <button onClick={() => setTab9Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
+                                    </div>
                                 </div>
                                 <div className="flex-1 shadow-2xl rounded overflow-hidden border border-gray-700 bg-gray-900 bg-opacity-90 backdrop-blur-sm">
                                     {viewMode === 'roll' ?
@@ -992,7 +1047,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                             <div className="relative z-10 flex flex-col h-full">
                                 <div className="flex justify-between items-center mb-2">
                                     <VisualizerToggle viewMode={viewMode} setViewMode={setViewMode} themeColor={themeColor} />
-                                    <button onClick={() => { setTab10InputA(""); setTab10InputB(""); setTab10Step(0); }} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2 shadow">Limpar Tudo</button>
+                                    <div className="flex items-center gap-2">
+                                        {viewMode === 'staff' && <StaffToolbar />}
+                                        <button onClick={() => { setTab10InputA(""); setTab10InputB(""); setTab10Step(0); }} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2 shadow">Limpar Tudo</button>
+                                    </div>
                                 </div>
 
                                 <div className="flex-1 shadow-2xl rounded overflow-hidden border border-gray-700 bg-gray-900 bg-opacity-90 backdrop-blur-sm">
