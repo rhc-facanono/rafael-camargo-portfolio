@@ -165,6 +165,22 @@ const codeData = [
             en: "Set A and B. Move the Slider to see, hear, and export the morphing.",
             es: "Defina A y B. Mueva el Slider para ver, escuchar y exportar el morphing."
         }
+    },
+    {
+        id: "tool-afinacoes", type: "tool", toolIndex: 11,
+        label: "Afinações & Scala",
+        color: "#00ffcc",
+        icon: <polygon points="12,2 22,20 2,20" stroke="white" strokeWidth="2" fill="none" strokeLinejoin="round" />,
+        contexto: {
+            pt: "O coração da Xenharmonia. O formato Scala (.scl) é o padrão ouro na pesquisa microtonal, permitindo a importação de milhares de afinações históricas, escalas de outras culturas ou temperamentos gerados matematicamente.",
+            en: "The heart of Xenharmony. The Scala format (.scl) is the gold standard in microtonal research.",
+            es: "El corazón de la Xenharmonía. El formato Scala (.scl) es el estándar en la investigación microtonal."
+        },
+        comoUsar: {
+            pt: "Selecione um sistema de Divisão Igual (EDO) como 19, 22 ou 31, ou importe um arquivo .scl. Ao clicar em 'Aplicar', o motor global da aplicação guardará essa afinação como referência.",
+            en: "Select an EDO or import a .scl file. Click 'Apply' to save this tuning as the global reference.",
+            es: "Seleccione un EDO o importe un archivo .scl. Haga clic en 'Aplicar' para guardar esta afinación como referencia global."
+        }
     }
 ];
 

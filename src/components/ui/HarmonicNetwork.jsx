@@ -6,6 +6,7 @@ import { calculateCardinalDensity, getIntervalVector } from "../../utils/costere
 import { useTuning } from "../../context/TuningContext";
 import GrandStaffVisualizer from "../visualizers/GrandStaffVisualizer";
 import StaffToolbar from "../visualizers/StaffToolbar";
+import { parseScalaFile, generateEdoScale } from "../../utils/scalaParser";
 
 const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -315,8 +316,8 @@ function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, o
 // COMPONENTE EXPORTADO PRINCIPAL
 // ==========================================
 export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a" }) {
-    // Trazendo o Contexto Microtonal Global
-    const { isMicrotonalMode, toggleMicrotonalMode } = useTuning();
+    // Trazendo o Contexto Microtonal Global e Afinações
+    const { isMicrotonalMode, toggleMicrotonalMode, activeTuning, setActiveTuning } = useTuning();
 
     const [baseNote, setBaseNote] = useState(48);
     const [intX, setIntX] = useState(7), [intY, setIntY] = useState(12), [intZ, setIntZ] = useState(4);
@@ -340,6 +341,11 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     const [tab10Algo, setTab10Algo] = useState("log"); // "log" ou "costere"
     const [tab10Step, setTab10Step] = useState(0);
     const [tab10StepsCount, setTab10StepsCount] = useState(20);
+
+    // ABA 11 - AFINAÇÕES E TEMPERAMENTOS
+    const [tab11Mode, setTab11Mode] = useState("edo"); // "edo" ou "scala"
+    const [tab11Edo, setTab11Edo] = useState(19);
+    const [tab11ScalaData, setTab11ScalaData] = useState(null);
 
     const [viewMode, setViewMode] = useState('staff');
 
@@ -1060,6 +1066,111 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     }
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ABA 11: AFINAÇÕES E TEMPERAMENTOS (SCALA & EDO) */}
+                {activeTool === 11 && (
+                    <div className="flex w-full h-full bg-gray-800">
+                        <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
+                            <div className="flex bg-gray-800 rounded border border-gray-600 overflow-hidden mb-2">
+                                <button onClick={() => setTab11Mode('edo')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab11Mode === 'edo' ? 'bg-[#00ffcc] text-black' : 'text-gray-400 hover:bg-gray-700'}`}>EDO / TET</button>
+                                <button onClick={() => setTab11Mode('scala')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab11Mode === 'scala' ? 'bg-[#00ffcc] text-black' : 'text-gray-400 hover:bg-gray-700'}`}>Arquivo .SCL</button>
+                            </div>
+
+                            {tab11Mode === 'edo' && (
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-gray-400">Divisões Iguais da Oitava (EDO):</label>
+                                    <input type="number" min="1" max="120" value={tab11Edo} onChange={e => setTab11Edo(Number(e.target.value))} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" />
+                                    <button
+                                        onClick={() => { setActiveTuning({ type: 'edo', divisions: tab11Edo }); if (!isMicrotonalMode) toggleMicrotonalMode(); }}
+                                        className="w-full bg-blue-700 hover:bg-blue-600 text-white text-[10px] py-2 rounded transition font-bold shadow-lg"
+                                    >
+                                        Aplicar {tab11Edo}-EDO Global
+                                    </button>
+                                </div>
+                            )}
+
+                            {tab11Mode === 'scala' && (
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-gray-400">Importar arquivo Scala (.scl):</label>
+                                    <input
+                                        type="file"
+                                        accept=".scl"
+                                        onChange={(e) => {
+                                            const file = e.target.files[0];
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onload = (evt) => setTab11ScalaData(parseScalaFile(evt.target.result));
+                                                reader.readAsText(file);
+                                            }
+                                        }}
+                                        className="w-full text-[9px] text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[9px] file:bg-gray-700 file:text-white hover:file:bg-gray-600 cursor-pointer"
+                                    />
+                                    {tab11ScalaData && (
+                                        <button
+                                            onClick={() => { setActiveTuning({ type: 'scala', data: tab11ScalaData }); if (!isMicrotonalMode) toggleMicrotonalMode(); }}
+                                            className="w-full bg-blue-700 hover:bg-blue-600 text-white text-[10px] py-2 rounded transition font-bold mt-2 shadow-lg"
+                                        >
+                                            Aplicar Afinação Scala Global
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="mt-auto pt-4 border-t border-gray-700">
+                                <div className="text-[10px] text-gray-400 mb-1">Afinação Global Ativa:</div>
+                                <div className="bg-gray-950 p-2 rounded border border-gray-700 text-[#00ffcc] font-mono text-[10px] font-bold shadow-inner">
+                                    {activeTuning.type === 'edo' ? `${activeTuning.divisions}-EDO (TET)` : `Scala: ${activeTuning.data?.description || 'Carregada'}`}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 min-w-0 p-4 bg-gray-950 overflow-auto custom-scrollbar">
+                            <h3 className="text-[#00ffcc] font-bold mb-4 uppercase tracking-widest border-b border-gray-800 pb-2 flex justify-between">
+                                <span>Painel de Análise da Afinação</span>
+                            </h3>
+
+                            {tab11Mode === 'edo' ? (
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                                    {generateEdoScale(tab11Edo).map((step, i) => (
+                                        <div key={i} className="bg-gray-900 p-3 rounded border border-gray-800 text-center shadow">
+                                            <div className="text-gray-500 text-[10px] uppercase">Grau {i + 1}</div>
+                                            <div className="text-white font-mono text-sm">{step.cents.toFixed(2)}c</div>
+                                            <div className="text-blue-400 font-mono text-[10px]">Ratio: {(step.ratio).toFixed(3)}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                tab11ScalaData ? (
+                                    <div className="space-y-4">
+                                        <div className="bg-gray-900 p-4 rounded border border-gray-800 shadow">
+                                            <div className="text-gray-400 text-xs mb-1 uppercase font-bold tracking-wider">Descrição Interna (.scl):</div>
+                                            <div className="text-white font-serif italic mb-2">"{tab11ScalaData.description}"</div>
+                                            <div className="text-gray-400 text-[10px]">Total de Notas na Oitava: <span className="text-[#00ffcc] font-bold">{tab11ScalaData.numNotes}</span></div>
+                                        </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                                            <div className="bg-gray-900 p-3 rounded border border-gray-800 text-center shadow">
+                                                <div className="text-gray-500 text-[10px] uppercase">Grau 0 (Tônica)</div>
+                                                <div className="text-white font-mono text-sm">0.00c</div>
+                                                <div className="text-blue-400 font-mono text-[10px]">Ratio: 1 / 1</div>
+                                            </div>
+                                            {tab11ScalaData.scale.map((step, i) => (
+                                                <div key={i} className="bg-gray-900 p-3 rounded border border-gray-800 text-center shadow">
+                                                    <div className="text-gray-500 text-[10px] uppercase">Grau {i + 1}</div>
+                                                    <div className="text-white font-mono text-sm">{step.cents.toFixed(2)}c</div>
+                                                    <div className="text-blue-400 font-mono text-[10px]">Ratio: {step.type === 'ratio' ? step.ratioStr : (step.ratio).toFixed(3)}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full">
+                                        <span className="text-gray-600 text-sm font-bold uppercase tracking-widest border border-dashed border-gray-700 p-8 rounded-lg">Aguardando arquivo Scala...</span>
+                                    </div>
+                                )
+                            )}
                         </div>
                     </div>
                 )}
