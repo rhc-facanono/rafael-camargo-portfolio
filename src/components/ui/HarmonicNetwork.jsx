@@ -7,6 +7,7 @@ import { useTuning } from "../../context/TuningContext";
 import GrandStaffVisualizer from "../visualizers/GrandStaffVisualizer";
 import StaffToolbar from "../visualizers/StaffToolbar";
 import { parseScalaFile, generateEdoScale } from "../../utils/scalaParser";
+import { useMidi } from "../../context/MidiContext";
 
 const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -730,6 +731,47 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [activeTool, tab2InputA, tab3Input, tab4Input, tab5Input, tab6Input, tab7Carrier, tab8Input, tab9Input, tab10InputA]);
 
+    const { lastEvent } = useMidi();
+    const [activeMidiNotes, setActiveMidiNotes] = useState(new Set());
+
+    useEffect(() => {
+        if (!lastEvent) return;
+        const { note, type, velocity } = lastEvent;
+
+        if (type === 'on' && velocity > 0) {
+            // LÓGICA PARA ABAS DE INSERÇÃO (2 a 10)
+            const tabInputMap = {
+                2: { val: tab2InputA, set: setTab2InputA },
+                3: { val: tab3Input, set: setTab3Input },
+                4: { val: tab4Input, set: setTab4Input },
+                6: { val: tab6Input, set: setTab6Input },
+                7: { val: tab7Carrier, set: setTab7Carrier },
+                8: { val: tab8Input, set: setTab8Input },
+                9: { val: tab9Input, set: setTab9Input },
+                10: { val: tab10InputA, set: setTab10InputA },
+            };
+
+            const current = tabInputMap[activeTool];
+            if (current) {
+                current.set(prev => prev ? `${prev}, ${note}` : `${note}`);
+            }
+
+            // LÓGICA PARA ABA 13 (TECLADO VIVO)
+            if (activeTool === 13) {
+                setActiveMidiNotes(prev => new Set(prev).add(note));
+                playAudio([midiToHz(note)], true); // Toca a nota na afinação atual!
+            }
+        } else {
+            if (activeTool === 13) {
+                setActiveMidiNotes(prev => {
+                    const copy = new Set(prev);
+                    copy.delete(note);
+                    return copy;
+                });
+                stopAudio(); // Opcional: manter ou parar o som
+            }
+        }
+    }, [lastEvent]);
     // RESTAURANDO OS BOTÕES DE PUXAR:
     const PullButtons = ({ onPull }) => (
         <div className="flex flex-wrap gap-1 mb-3 border-b border-gray-700 pb-2">
@@ -1249,6 +1291,122 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     </div>
                                 )
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ABA 12: MANUAL DO USUÁRIO */}
+                {activeTool === 12 && (
+                    <div className="flex w-full h-full bg-gray-900 overflow-y-auto custom-scrollbar p-8 justify-center">
+                        <div className="max-w-4xl w-full text-gray-300 space-y-8 pb-12">
+
+                            <div className="border-b border-gray-700 pb-4 mb-6">
+                                <h2 className="text-3xl font-bold text-white mb-2 tracking-wide">Manual do Sistema Harmônico</h2>
+                                <p className="text-gray-400">Guia de referência para todas as funcionalidades, sínteses e cálculos da plataforma.</p>
+                            </div>
+
+                            <section className="space-y-4">
+                                <h3 className="text-xl font-bold text-[#00ffcc] uppercase tracking-widest border-l-4 border-[#00ffcc] pl-3">Controles Globais</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
+                                        <h4 className="font-bold text-white mb-1">Modo Xenharmônico (Toggle)</h4>
+                                        <p className="text-sm">Abandona os 12 semitons. Quando ativo, o aplicativo calcula áudio e matemática com base na afinação escolhida na Aba 11 (ex: 19-TET, Scala). A nota Dó Central (60) é a âncora fixa em 261.625 Hz.</p>
+                                    </div>
+                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
+                                        <h4 className="font-bold text-white mb-1">Atalho Alt + Setas</h4>
+                                        <p className="text-sm">Ao clicar em qualquer caixa de texto, pressione <code className="bg-gray-950 px-1 rounded text-orange-300">Alt + ↑</code> ou <code className="bg-gray-950 px-1 rounded text-orange-300">Alt + ↓</code> para transpor instantaneamente a última nota digitada em um degrau.</p>
+                                    </div>
+                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
+                                        <h4 className="font-bold text-white mb-1">Botões "Puxar de:"</h4>
+                                        <p className="text-sm">Servem para transferir resultados entre abas. Gere um acorde na Rede 3D e clique em "Puxar de: Rede" na Aba de Síntese FM para enviar as notas para lá.</p>
+                                    </div>
+                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
+                                        <h4 className="font-bold text-white mb-1">Barra de Acidentes (Partitura)</h4>
+                                        <p className="text-sm">Arme os botões de Bemol, Sustenido ou Quartos-de-tom e faça <code className="bg-gray-950 px-1 rounded text-orange-300">Ctrl + Clique</code> na pauta para inserir a nota alterada.</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="space-y-4">
+                                <h3 className="text-xl font-bold text-blue-400 uppercase tracking-widest border-l-4 border-blue-400 pl-3">Módulos de Ferramentas</h3>
+
+                                <div className="space-y-3">
+                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
+                                        <h4 className="font-bold text-white">1. Redes Harmônicas 3D</h4>
+                                        <p className="text-sm mt-1">Navegue por um labirinto geométrico. <strong>X, Y, Z</strong> definem a distância dos eixos. Segure <strong>Ctrl + Clique</strong> nas esferas 3D para gerar os acordes baseados em distâncias simétricas.</p>
+                                    </div>
+
+                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
+                                        <h4 className="font-bold text-white">2. Multiplicação de Acordes</h4>
+                                        <p className="text-sm mt-1">Transpõe o acorde A sobre cada nota do acorde B. O modo <strong>Valores Não Temperados</strong> faz a multiplicação pura em Hertz (Just Intonation), criando clusters microtonais absolutos.</p>
+                                    </div>
+
+                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
+                                        <h4 className="font-bold text-white">3. Módulos Cíclicos & 4. Projeções Proporcionais</h4>
+                                        <p className="text-sm mt-1"><strong>Módulos:</strong> Repete uma célula até fechar oitava. <strong>Projeções:</strong> Estica ou comprime o intervalo total do acorde para caber entre um novo Min (Hz) e Max (Hz).</p>
+                                    </div>
+
+                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
+                                        <h4 className="font-bold text-white">6. Ring Modulation & 7. Síntese FM</h4>
+                                        <p className="text-sm mt-1"><strong>RM:</strong> Multiplica as portadoras, gerando frequências de soma e diferença. <strong>FM:</strong> Uma moduladora cria bandas laterais (Sidebands) em torno da portadora baseada no Índice K.</p>
+                                    </div>
+
+                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
+                                        <h4 className="font-bold text-white">9. Calc. Costère & 10. Interpolações</h4>
+                                        <p className="text-sm mt-1"><strong>Costère:</strong> Mostra o mapa de gravidade do acorde (para onde ele "quer" resolver). <strong>Interpolação:</strong> O slider faz o "morphing" gradual no tempo entre um acorde A e um acorde B.</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                        </div>
+                    </div>
+                )}
+
+                {/* ABA 13: TECLADO MICROTONAL INTERATIVO */}
+                {activeTool === 13 && (
+                    <div className="flex flex-col w-full h-full bg-gray-900 p-6">
+                        <div className="mb-6 border-b border-gray-700 pb-4">
+                            <h2 className="text-2xl font-bold text-[#00ffcc]">Teclado Xenharmônico Vivo</h2>
+                            <p className="text-gray-400 text-sm">Toque no seu piano digital para ouvir a afinação: {activeTuning.type === 'edo' ? `${activeTuning.divisions}-EDO` : 'Arquivo Scala'}.</p>
+                        </div>
+
+                        <div className="flex-1 flex items-center justify-center overflow-x-auto custom-scrollbar">
+                            <div className="flex gap-1 h-64 items-end pb-10">
+                                {Array.from({ length: 49 }, (_, i) => i + 36).map(m => {
+                                    const isActive = activeMidiNotes.has(m);
+                                    const hz = midiToHz(m);
+                                    const isBlack = [1, 3, 6, 8, 10].includes(m % 12);
+
+                                    return (
+                                        <div
+                                            key={m}
+                                            className={`relative transition-all duration-75 flex flex-col justify-end items-center rounded-b-md
+                                                ${isBlack ? 'w-8 h-40 z-10 -mx-4 border-gray-800' : 'w-12 h-56 border-gray-400'}
+                                                ${isActive ? 'bg-[#00ffcc] translate-y-2 shadow-[0_0_20px_#00ffcc]' : isBlack ? 'bg-gray-800' : 'bg-white'}
+                                                border-2 cursor-pointer shadow-lg`}
+                                            onMouseDown={() => playAudio([midiToHz(m)], true)}
+                                        >
+                                            <span className={`text-[8px] font-bold mb-2 ${isBlack ? 'text-gray-400' : 'text-gray-600'}`}>
+                                                {m}
+                                            </span>
+                                            <div className="absolute -bottom-8 text-[10px] font-mono text-blue-400">
+                                                {isActive && `${hz.toFixed(1)}Hz`}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-950 p-4 rounded border border-gray-700 mt-4">
+                            <h4 className="text-[10px] text-gray-500 uppercase font-bold mb-2">Monitor de Snap (Grade Atual)</h4>
+                            <div className="flex flex-wrap gap-2 min-h-[40px]">
+                                {Array.from(activeMidiNotes).map(n => (
+                                    <div key={n} className="bg-blue-900 px-3 py-1 rounded text-[10px] border border-blue-400 animate-pulse">
+                                        Entrada MIDI: {n} → <span className="text-white font-bold">{midiToHz(n).toFixed(2)} Hz</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 )}

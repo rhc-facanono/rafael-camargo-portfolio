@@ -1,15 +1,27 @@
 import React, { useState } from "react";
 import HarmonicNetwork from "./HarmonicNetwork";
 
-// Paleta de Cores Padrão
-const VINHO = "#e4a8bc";
+// ==========================================
+// PALETA DE CORES PADRÃO
+// ==========================================
 const MARINHO = "#9fb1db";
+const VINHO = "#e4a8bc";
+const LILAS = "#c0a8e4";
+const MENTA = "#a8e4bc";
+const AMARELO = "#e4d9a8";
+const SALMAO = "#db9f9f";
+const CIANO = "#9fdbcf";
+const CINZA = "#b0b0b0";
+const OURO = "#ffdd57";
+const CORAL = "#ff6b6b";
+const NEON = "#00ffcc";
+const BRANCO = "#ffffff";
 
 const codeData = [
     {
         id: "tool-redes", type: "tool", toolIndex: 1,
         label: "Redes Harmônicas 3D",
-        color: "#9fb1db",
+        color: MARINHO,
         icon: <circle cx="12" cy="12" r="8" stroke="white" strokeWidth="2" fill="none" strokeDasharray="4 4" />,
         contexto: {
             pt: "Baseada na 'Tonnetz' de Euler e nas teorias de Henri Pousseur, esta ferramenta espacializa a harmonia num labirinto 3D infinito. Os eixos X, Y e Z representam distâncias intervalares, permitindo navegar por campos harmônicos de forma geometricamente simétrica.",
@@ -25,7 +37,7 @@ const codeData = [
     {
         id: "tool-multiplicacao", type: "tool", toolIndex: 2,
         label: "Multiplicação de Acordes",
-        color: "#e4a8bc",
+        color: VINHO,
         icon: <rect x="4" y="4" width="16" height="16" stroke="white" strokeWidth="2" fill="none" transform="rotate(45 12 12)" />,
         contexto: {
             pt: "Técnica fundamental do serialismo integral (usada por Pierre Boulez). A Multiplicação de Acordes transpõe uma Entidade A (multiplicando) para cada nota de uma Entidade B (multiplicador), gerando complexos harmônicos densos e coerentes.",
@@ -41,7 +53,7 @@ const codeData = [
     {
         id: "tool-modulos", type: "tool", toolIndex: 3,
         label: "Módulos Cíclicos",
-        color: "#c0a8e4",
+        color: LILAS,
         icon: <path d="M12 2v20m-10-10h20" stroke="white" strokeWidth="2" strokeLinecap="round" />,
         contexto: {
             pt: "Inspirado nas escalas de transposição limitada de Olivier Messiaen e na harmonia pós-tonal. Gera padrões simétricos infinitos repetindo um intervalo gerador até fechar o ciclo da oitava ou do temperamento atual.",
@@ -57,7 +69,7 @@ const codeData = [
     {
         id: "tool-projecoes", type: "tool", toolIndex: 4,
         label: "Projeções Proporcionais",
-        color: "#a8e4bc",
+        color: MENTA,
         icon: <polygon points="12,2 22,20 2,20" stroke="white" strokeWidth="2" fill="none" />,
         contexto: {
             pt: "Conceito do Espectralismo. Permite expandir ou comprimir o espaço acústico de um acorde, mantendo a proporção logarítmica entre as notas. Transforma clusters densos em texturas abertas (e vice-versa) preservando a 'impressão digital' intervalar.",
@@ -73,7 +85,7 @@ const codeData = [
     {
         id: "tool-matriz", type: "tool", toolIndex: 5,
         label: "Matriz Dodecafônica",
-        color: "#e4d9a8",
+        color: AMARELO,
         icon: <rect x="3" y="3" width="18" height="18" stroke="white" strokeWidth="2" fill="none" strokeDasharray="6 6" />,
         contexto: {
             pt: "A base do Dodecafonismo de Schoenberg. Calcula todas as permutações (Original, Retrógrado, Inversão e Retrógrado da Inversão) de uma série. O 'Modo Livre' permite expandir a matriz para microtonalismo (NxN).",
@@ -89,7 +101,7 @@ const codeData = [
     {
         id: "tool-ring", type: "tool", toolIndex: 6,
         label: "Ring Modulation",
-        color: "#db9f9f",
+        color: SALMAO,
         icon: <circle cx="12" cy="12" r="8" stroke="white" strokeWidth="2" fill="none" />,
         contexto: {
             pt: "Processo acústico onde duas (ou mais) frequências são multiplicadas, gerando frequências de Soma (A+B) e Diferença (|A-B|). Muito usado na música eletrônica primitiva (Stockhausen) para criar espectros inarmônicos e sons de sinos.",
@@ -105,7 +117,7 @@ const codeData = [
     {
         id: "tool-fm", type: "tool", toolIndex: 7,
         label: "Síntese FM",
-        color: "#9fdbcf",
+        color: CIANO,
         icon: <path d="M2 12 Q 7 2, 12 12 T 22 12" stroke="white" strokeWidth="2" fill="none" />,
         contexto: {
             pt: "Síntese por Modulação em Frequência (John Chowning). Uma onda Moduladora altera a frequência de uma Portadora em alta velocidade, gerando bandas laterais matemáticas complexas (Sidebands = C ± kM).",
@@ -121,7 +133,7 @@ const codeData = [
     {
         id: "tool-add", type: "tool", toolIndex: 8,
         label: "Síntese Aditiva",
-        color: "#b0b0b0",
+        color: CINZA,
         icon: <path d="M4 12h16M12 4v16" stroke="white" strokeWidth="2" strokeLinecap="round" />,
         contexto: {
             pt: "Baseada no Teorema de Fourier. A ferramenta projeta a Série Harmônica (projeção otonal / multiplicação) e a Série Sub-Harmônica (projeção utonal / divisão) a partir das frequências fundamentais inseridas.",
@@ -137,7 +149,7 @@ const codeData = [
     {
         id: "tool-costere-calc", type: "tool", toolIndex: 9,
         label: "Calculadora Costère",
-        color: "#ffdd57",
+        color: OURO,
         icon: <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" fill="none" strokeDasharray="2 4" />,
         contexto: {
             pt: "Física Acústica e Gravidade. Baseado nas leis matemáticas de Edmond Costère, este algoritmo mede as 'Densidades Cardinais' de um acorde. Ele revela para onde um conjunto de notas 'quer' resolver acusticamente, criando um mapa vetorial de tensão.",
@@ -153,7 +165,7 @@ const codeData = [
     {
         id: "tool-costere-interp", type: "tool", toolIndex: 10,
         label: "Interpolação & Morphing",
-        color: "#ff6b6b",
+        color: CORAL,
         icon: <path d="M4 12c4-8 12-8 16 0" stroke="white" strokeWidth="2" fill="none" />,
         contexto: {
             pt: "Algoritmos de transição morfológica de materiais sonoros. A Interpolação Logarítmica viaja em linha reta pelo espaço. A Interpolação de Costère viaja puxada pela gravidade acústica, movendo as notas para os pontos de atração do acorde final antes de chegarem ao destino.",
@@ -169,7 +181,7 @@ const codeData = [
     {
         id: "tool-afinacoes", type: "tool", toolIndex: 11,
         label: "Afinações & Scala",
-        color: "#00ffcc",
+        color: NEON,
         icon: <polygon points="12,2 22,20 2,20" stroke="white" strokeWidth="2" fill="none" strokeLinejoin="round" />,
         contexto: {
             pt: "O coração da Xenharmonia. O formato Scala (.scl) é o padrão ouro na pesquisa microtonal, permitindo a importação de milhares de afinações históricas, escalas exóticas ou temperamentos matemáticos contínuos.",
@@ -180,6 +192,38 @@ const codeData = [
             pt: "Selecione um sistema de Divisão Igual (EDO) como 19, 24 ou 31, ou importe um arquivo .scl do seu PC. Ao clicar em 'Aplicar', o Toggle 'Modo Xenharmônico' será ativado, e todo o áudio e matemática do site passarão a obedecer a essa nova afinação.",
             en: "Select an EDO or import a .scl file. Click 'Apply' to activate Xenharmonic Mode. All audio and math in the app will now obey this new tuning.",
             es: "Seleccione un EDO o importe un archivo .scl. Haga clic en 'Aplicar' para activar el Modo Xenharmónico en toda la aplicación."
+        }
+    },
+    {
+        id: "tool-manual", type: "tool", toolIndex: 12,
+        label: "Manual do Usuário",
+        color: BRANCO,
+        icon: <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13ZM4 19.5v-13" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />,
+        contexto: {
+            pt: "Guia completo de utilização da plataforma. Entenda os conceitos globais, atalhos de teclado e o funcionamento profundo de cada módulo acústico e matemático.",
+            en: "Complete user guide for the platform. Understand global concepts, keyboard shortcuts, and the deep mechanics of each acoustic and mathematical module.",
+            es: "Guía completa del usuario para la plataforma. Entienda los conceptos globales, atajos de teclado y la mecánica profunda de cada módulo acústico y matemático."
+        },
+        comoUsar: {
+            pt: "Leia este manual para dominar a ferramenta. Você aprenderá como usar o motor Xenharmônico, como exportar MIDI e como conectar os resultados de uma aba em outra.",
+            en: "Read this manual to master the tool. You will learn how to use the Xenharmonic engine, export MIDI, and connect results between tabs.",
+            es: "Lea este manual para dominar la herramienta. Aprenderá a utilizar el motor Xenarmónico, exportar MIDI y conectar resultados entre pestañas."
+        }
+    },
+    {
+        id: "tool-teclado", type: "tool", toolIndex: 13,
+        label: "Teclado Interativo",
+        color: NEON,
+        icon: <rect x="3" y="5" width="18" height="14" rx="2" stroke="white" strokeWidth="2" fill="none" />,
+        contexto: {
+            pt: "Uma estação de performance em tempo real. Conecte seu teclado MIDI e ouça as afinações microtonais instantaneamente.",
+            en: "A real-time performance station. Connect your MIDI keyboard and hear microtonal tunings instantly.",
+            es: "Una estación de interpretación en tiempo real. Conecte su teclado MIDI y escuche afinaciones microtonales al instante."
+        },
+        comoUsar: {
+            pt: "Conecte seu piano via USB. Selecione uma afinação na Aba 11 e toque aqui. O som será processado pelo motor xenharmônico global. Você também pode inserir notas via teclado MIDI em qualquer outra ferramenta.",
+            en: "Connect your piano via USB. Select a tuning in Tab 11 and play here. Audio is processed by the global xenharmonic engine. You can also insert notes via MIDI keyboard in any other tool.",
+            es: "Conecte su piano. Seleccione una afinación en la Pestaña 11 y toque. El sonido será procesado por el motor xenharmónico global. También puede insertar notas a través del teclado MIDI en cualquier otra herramienta."
         }
     }
 ];
