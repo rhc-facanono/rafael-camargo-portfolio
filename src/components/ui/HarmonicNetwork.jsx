@@ -521,9 +521,9 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         let hzArr = parseAdvancedToHz(tab4Input);
         if (hzArr.length < 2) return [];
         let minHz = Math.min(...hzArr), maxHz = Math.max(...hzArr);
-        if (minHz === maxHz) return hzArr;
-        return hzArr.map(f => targetMinHz * Math.pow((targetMaxHz / targetMinHz), (Math.log(f) - Math.log(minHz)) / (Math.log(maxHz) - Math.log(minHz))));
-    }, [tab4Input, targetMinHz, targetMaxHz]);
+        if (minHz === maxHz) return applySnap(hzArr);
+        return applySnap(hzArr.map(f => targetMinHz * Math.pow((targetMaxHz / targetMinHz), (Math.log(f) - Math.log(minHz)) / (Math.log(maxHz) - Math.log(minHz)))));
+    }, [tab4Input, targetMinHz, targetMaxHz, globalSnap, isMicrotonalMode, activeTuning]);
 
     const tab4MidiEquivalents = useMemo(() => tab4ResultHz.map(hzToMidi), [tab4ResultHz]);
 
@@ -551,21 +551,21 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             currentGen = Array.from(nextGen); currentGen.forEach(f => res.add(f));
             if (res.size > tab6Limit * 3) break;
         }
-        return Array.from(res).sort((a, b) => a - b).slice(0, tab6Limit);
-    }, [tab6Input, tab6Limit, tab6Order, isMicrotonalMode, activeTuning]);
+        return applySnap(Array.from(res).sort((a, b) => a - b).slice(0, tab6Limit));
+    }, [tab6Input, tab6Limit, tab6Order, globalSnap, isMicrotonalMode, activeTuning]);
 
     const tab7ResultHz = useMemo(() => {
         let C_arr = parseAdvancedToHz(tab7Carrier); if (!C_arr.length) C_arr = [440];
         let M = parseAdvancedToHz(tab7Modulator)[0] || 100, res = new Set();
         C_arr.forEach(C => { res.add(C); for (let i = 1; i <= tab7K; i++) { res.add(C + i * M); res.add(Math.abs(C - i * M)); } });
-        return Array.from(res).sort((a, b) => a - b);
-    }, [tab7Carrier, tab7Modulator, tab7K, isMicrotonalMode, activeTuning]);
+        return applySnap(Array.from(res).sort((a, b) => a - b));
+    }, [tab7Carrier, tab7Modulator, tab7K, globalSnap, isMicrotonalMode, activeTuning]);
 
     const tab8ResultHz = useMemo(() => {
         let hzArr = parseAdvancedToHz(tab8Input), res = new Set();
         hzArr.forEach(f => { for (let i = 1; i <= tab8Harmonics; i++) res.add(f * i); for (let i = 1; i <= tab8Sub; i++) res.add(f / i); });
-        return Array.from(res).sort((a, b) => a - b);
-    }, [tab8Input, tab8Harmonics, tab8Sub, isMicrotonalMode, activeTuning]);
+        return applySnap(Array.from(res).sort((a, b) => a - b));
+    }, [tab8Input, tab8Harmonics, tab8Sub, globalSnap, isMicrotonalMode, activeTuning]);
 
     // ABA 9: Calculadora Costère Dinâmica
     const tab9Arr = useMemo(() => parseAdvancedToHz(tab9Input).map(hzToMidi), [tab9Input]);
@@ -944,16 +944,33 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         <div className="w-full h-full relative flex flex-col bg-gray-950 font-sans text-white">
 
             {/* BARRA GLOBAL SUPERIOR: Fica fora do caminho de tudo */}
-            <div className="w-full bg-gray-900 border-b border-gray-700 p-2 flex justify-end items-center z-50 shadow-md">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-2">
-                    {isMicrotonalMode ? 'Modo Xenharmônico' : 'Modo 12-TET'}
-                </span>
-                <button
-                    onClick={toggleMicrotonalMode}
-                    className={`w-10 h-5 rounded-full p-1 transition-colors ${isMicrotonalMode ? 'bg-[#00ffcc]' : 'bg-gray-600'}`}
-                >
-                    <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${isMicrotonalMode ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
+            <div className="w-full bg-gray-900 border-b border-gray-700 p-2 flex justify-end items-center z-50 shadow-md gap-6">
+
+                {/* TOGGLE SNAP TO GRID (QUANTIZAR) */}
+                <div className="flex items-center">
+                    <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest mr-2">
+                        Quantizar (Snap)
+                    </span>
+                    <button
+                        onClick={() => setGlobalSnap(!globalSnap)}
+                        className={`w-10 h-5 rounded-full p-1 transition-colors ${globalSnap ? 'bg-indigo-600' : 'bg-gray-700'}`}
+                    >
+                        <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${globalSnap ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                </div>
+
+                {/* TOGGLE XENHARMÔNICO */}
+                <div className="flex items-center">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-2">
+                        {isMicrotonalMode ? 'Modo Xenharmônico' : 'Modo 12-TET'}
+                    </span>
+                    <button
+                        onClick={toggleMicrotonalMode}
+                        className={`w-10 h-5 rounded-full p-1 transition-colors ${isMicrotonalMode ? 'bg-[#00ffcc]' : 'bg-gray-600'}`}
+                    >
+                        <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${isMicrotonalMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                </div>
             </div>
 
             <div className="flex-1 relative flex overflow-hidden">
