@@ -6,7 +6,7 @@ import { calculateCardinalDensity, getIntervalVector } from "../../utils/costere
 import { useTuning } from "../../context/TuningContext";
 import GrandStaffVisualizer from "../visualizers/GrandStaffVisualizer";
 import StaffToolbar from "../visualizers/StaffToolbar";
-import { parseScalaFile, generateEdoScale } from "../../utils/scalaParser";
+import { parseScalaFile, generateEdoScale, parseCustomTuning } from "../../utils/scalaParser";
 import { useMidi } from "../../context/MidiContext";
 
 const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -219,7 +219,7 @@ function NotePoint({ pt, selectedSet, toggleSelect, blendedHue, isSel, ignoreNex
 }
 
 
-function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, onKeyClick = null, onNoteDrag = null, onNoteDelete = null, originalEntityLength = 0 }) {
+function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, onKeyClick = null, onNoteDrag = null, onNoteDelete = null, originalEntityLength = 0, getIsBlackKey }) {
     const minMidi = 36, maxMidi = 96, rowHeight = 14, totalHeight = (maxMidi - minMidi + 1) * rowHeight;
     const svgWidth = Math.max(800, 40 + notes.length * 30 + 50);
     const [draggingIdx, setDraggingIdx] = useState(null);
@@ -244,7 +244,7 @@ function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, o
             <div ref={leftRef} className="w-[60px] flex-shrink-0 bg-gray-800 border-r border-gray-600 z-10 overflow-hidden">
                 <svg width="60" height={totalHeight} className="w-full">
                     {Array.from({ length: maxMidi - minMidi + 1 }).map((_, i) => {
-                        let m = maxMidi - i, y = i * rowHeight, isBlack = [1, 3, 6, 8, 10].includes(m % 12), isC = (m % 12 === 0);
+                        let m = maxMidi - i, y = i * rowHeight, isBlack = typeof getIsBlackKey === 'function' ? getIsBlackKey(m) : [1, 3, 6, 8, 10].includes(m % 12), isC = (m % 12 === 0);
                         return (
                             <g key={`key-${m}`} onClick={() => onKeyClick && onKeyClick(m)} style={{ cursor: onKeyClick ? 'pointer' : 'default' }}>
                                 <rect x={0} y={y} width="60" height={rowHeight} fill={isBlack ? "#222" : "#eee"} stroke="#999" strokeWidth="1" />
@@ -258,7 +258,7 @@ function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, o
             <div className="flex-1 min-w-0 overflow-auto custom-scrollbar relative" onScroll={handleScroll} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}>
                 <svg width={svgWidth} height={totalHeight} style={{ minWidth: `${svgWidth}px`, display: 'block' }}>
                     {Array.from({ length: maxMidi - minMidi + 1 }).map((_, i) => {
-                        let m = maxMidi - i, y = i * rowHeight, isBlack = [1, 3, 6, 8, 10].includes(m % 12);
+                        let m = maxMidi - i, y = i * rowHeight, isBlack = typeof getIsBlackKey === 'function' ? getIsBlackKey(m) : [1, 3, 6, 8, 10].includes(m % 12);
                         return <line key={`grid-${m}`} x1="0" y1={y} x2="100%" y2={y} stroke={isBlack ? "#333" : "#444"} strokeWidth="1" opacity="0.5" />;
                     })}
                     {notes.map((midi, idx) => {
@@ -276,35 +276,41 @@ function BachRollVisualizer({ notes, isSequence = false, isMicrotonal = false, o
 // COMPONENTE EXPORTADO PRINCIPAL
 // ==========================================
 export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a" }) {
-    // Trazendo o Contexto Microtonal Global e Afinações
-    const { isMicrotonalMode, toggleMicrotonalMode, activeTuning, setActiveTuning } = useTuning();
+    // Trazendo o Contexto Microtonal Global, Afinações e Variáveis do Scale Workshop
+    const {
+        isMicrotonalMode, toggleMicrotonalMode, activeTuning, setActiveTuning,
+        baseMidi, setBaseMidi, baseHz, setBaseHz,
+        keyColorMode, setKeyColorMode, customKeyPattern, setCustomKeyPattern
+    } = useTuning();
 
     // ==========================================
     // MOTORES DE FREQUÊNCIA (AGORA GLOBAIS E DINÂMICOS)
     // ==========================================
 
+    // ==========================================
+    // MOTORES GLOBAIS COM ÂNCORAS DINÂMICAS E SNAP-TO-FREQ
+    // ==========================================
     function midiToHz(m) {
         if (!isMicrotonalMode) return 440 * Math.pow(2, (m - 69) / 12);
 
         if (activeTuning.type === 'edo') {
-            // Âncora: Dó Central (MIDI 60 = 261.625 Hz)
-            return 261.625565 * Math.pow(2, (m - 60) / activeTuning.divisions);
+            return baseHz * Math.pow(2, (m - baseMidi) / activeTuning.divisions);
         }
 
         if (activeTuning.type === 'scala' && activeTuning.data) {
             const scale = activeTuning.data.scale;
             const scaleLen = scale.length;
-            if (scaleLen === 0) return 261.625565;
+            if (scaleLen === 0) return baseHz;
             const periodRatio = scale[scaleLen - 1].ratio;
 
-            const diff = m - 60;
+            const diff = m - baseMidi;
             const periods = Math.floor(diff / scaleLen);
             const degree = ((Math.round(diff) % scaleLen) + scaleLen) % scaleLen;
 
             let ratioWithinPeriod = 1;
             if (degree > 0) ratioWithinPeriod = scale[degree - 1].ratio;
 
-            return 261.625565 * Math.pow(periodRatio, periods) * ratioWithinPeriod;
+            return baseHz * Math.pow(periodRatio, periods) * ratioWithinPeriod;
         }
         return 440 * Math.pow(2, (m - 69) / 12);
     }
@@ -314,18 +320,18 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         if (!isMicrotonalMode) return 69 + 12 * Math.log2(hz / 440);
 
         if (activeTuning.type === 'edo') {
-            return 60 + activeTuning.divisions * Math.log2(hz / 261.625565);
+            return baseMidi + activeTuning.divisions * Math.log2(hz / baseHz);
         }
 
         if (activeTuning.type === 'scala' && activeTuning.data) {
             const scale = activeTuning.data.scale;
             const scaleLen = scale.length;
-            if (scaleLen === 0) return 60;
+            if (scaleLen === 0) return baseMidi;
             const periodRatio = scale[scaleLen - 1].ratio;
 
-            const periodsFractional = Math.log(hz / 261.625565) / Math.log(periodRatio);
+            const periodsFractional = Math.log(hz / baseHz) / Math.log(periodRatio);
             const periods = Math.floor(periodsFractional);
-            const hzWithinPeriod = hz / (261.625565 * Math.pow(periodRatio, periods));
+            const hzWithinPeriod = hz / (baseHz * Math.pow(periodRatio, periods));
 
             let closestDegree = 0;
             let minDiff = Math.abs(hzWithinPeriod - 1);
@@ -337,18 +343,44 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     closestDegree = i + 1;
                 }
             }
-            return 60 + (periods * scaleLen) + closestDegree;
+            return baseMidi + (periods * scaleLen) + closestDegree;
         }
         return 69 + 12 * Math.log2(hz / 440);
     }
 
-    function midiToNote(midi) {
-        if (midi === undefined || midi === null) return "";
-        if (isMicrotonalMode) return `Grau ${Math.round(midi)}`;
-        const name = noteNames[((Math.round(midi) % 12) + 12) % 12];
-        const oct = Math.floor(Math.round(midi) / 12) - 1;
+    // Retorna a nota 12-TET mais próxima com o desvio em Cents (Ex: E4 -21c)
+    function midiToNote(m) {
+        if (m === undefined || m === null) return "";
+        if (isMicrotonalMode) {
+            const hz = midiToHz(m);
+            const stdMidi = 69 + 12 * Math.log2(hz / 440); // Onde essa freq cairia no piano normal?
+            const intM = Math.round(stdMidi);
+            const cents = Math.round((stdMidi - intM) * 100);
+            const name = noteNames[((intM % 12) + 12) % 12];
+            const oct = Math.floor(intM / 12) - 1;
+            const sign = cents > 0 ? '+' : '';
+            return `${name}${oct}${cents !== 0 ? ' ' + sign + cents + 'c' : ''}`;
+        }
+        const name = noteNames[((Math.round(m) % 12) + 12) % 12];
+        const oct = Math.floor(Math.round(m) / 12) - 1;
         return name + oct;
     }
+
+    // Utilitário para os Visualizadores converterem Hertz em espaço físico Y no SVG
+    const hzToStandardMidi = (hz) => 69 + 12 * Math.log2(hz / 440);
+
+    // O "Snap-to-Freq" do Pentagrama/Teclado!
+    const handleStaffClick = (clickedMidi12TET, setInputState) => {
+        if (!isMicrotonalMode) {
+            setInputState(prev => prev ? prev + ", " + clickedMidi12TET : String(clickedMidi12TET));
+        } else {
+            // Qual a frequência física da linha que o usuário clicou?
+            const targetHz = 440 * Math.pow(2, (clickedMidi12TET - 69) / 12);
+            // Qual degrau da nossa escala maluca está mais perto dessa frequência?
+            const nearestStep = Math.round(hzToMidi(targetHz));
+            setInputState(prev => prev ? prev + ", " + nearestStep : String(nearestStep));
+        }
+    };
 
     function parseAdvancedToHz(str) {
         if (!str) return [];
@@ -369,10 +401,8 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             midi: midis.map(m => Math.round(m)).join(', '),
             midiCents: midis.map(m => `${Math.floor(m)}${Math.round((m % 1) * 100).toString().padStart(2, '0')}c`).join(', '),
             hz: hzArray.map(hz => `${hz.toFixed(2)}Hz`).join(', '),
-            notes: midis.map(m => {
-                let intM = Math.round(m), c = Math.round((m - intM) * 100);
-                return c === 0 ? midiToNote(intM) : `${midiToNote(intM)}${c > 0 ? '+' : ''}${c}c`;
-            }).join(', '),
+            // Correção: midiToNote já faz o cálculo de cents internamente, então só chamamos a função!
+            notes: midis.map(m => midiToNote(m)).join(', '),
             quarters: midis.map(m => {
                 if (isMicrotonalMode) return `${m.toFixed(1)} graus`;
                 const mQ = Math.round(m * 2) / 2;
@@ -665,6 +695,90 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     });
     const PanControlsSingleton = useMemo(() => <PanControls ignoreNextRef={ignoreNextRef} ref={panControlsRef} />, []);
 
+    // ==========================================
+    // GERADOR DINÂMICO DE CORES DE TECLAS (HALBERSTADT) E TRADUTOR GLOBAL
+    // ==========================================
+
+    // Função que decide se uma tecla é branca ou preta baseado na afinação
+    const getIsBlackKey = (m) => {
+        if (!isMicrotonalMode || keyColorMode === '12-tet') {
+            return [1, 3, 6, 8, 10].includes(((Math.round(m) % 12) + 12) % 12);
+        }
+
+        if (keyColorMode === 'custom') {
+            const patternLen = customKeyPattern.length;
+            if (patternLen === 0) return false;
+            const idx = ((Math.round(m) % patternLen) + patternLen) % patternLen;
+            return customKeyPattern[idx] === 'B';
+        }
+
+        // Modo 'auto' (Gera o padrão Halberstadt para qualquer EDO)
+        if (activeTuning.type === 'edo') {
+            const edo = activeTuning.divisions;
+            // Aproximação do salto de Quinta Justa no EDO atual
+            const fifth = Math.round((702 / 1200) * edo);
+            const degree = ((Math.round(m) % edo) + edo) % edo;
+            // Lógica geradora diatônica (F, C, G, D, A, E, B)
+            let isDiatonic = false;
+            for (let i = -1; i <= 5; i++) {
+                if ((((i * fifth) % edo) + edo) % edo === degree) isDiatonic = true;
+            }
+            return !isDiatonic; // Se não é diatônica (branca), é preta
+        }
+
+        // Se for Scala/JI e estiver em auto, cai no padrão do 12-TET por segurança
+        return [1, 3, 6, 8, 10].includes(((Math.round(m) % 12) + 12) % 12);
+    };
+
+    // Ref genérica para sabermos qual era a afinação anterior
+    const prevTuningRef = useRef(activeTuning);
+    const prevHzRef = useRef(baseHz);
+
+    // O Tradutor Silencioso (Snap-to-Freq ao trocar de afinação)
+    useEffect(() => {
+        const prevTuning = prevTuningRef.current;
+        const prevBaseHz = prevHzRef.current;
+
+        // Se a afinação realmente mudou
+        if (prevTuning.type !== activeTuning.type || prevTuning.divisions !== activeTuning.divisions || prevTuning.data !== activeTuning.data || prevBaseHz !== baseHz) {
+
+            // Função interna que converte os números antigos em Hertz (usando a regra antiga) e converte de volta (usando a nova)
+            const translateString = (str) => {
+                if (!str) return str;
+                const parts = str.split(/[,;\s]+/).filter(Boolean);
+                return parts.map(p => {
+                    const num = parseFloat(p);
+                    if (isNaN(num)) return p;
+                    if (p.toLowerCase().includes('hz')) return p; // Se já é Hz, ignora
+
+                    // Cálculo manual do Hertz usando a configuração antiga
+                    let oldHz = 440 * Math.pow(2, (num - 69) / 12); // Padrão 12-tet
+                    if (isMicrotonalMode && prevTuning.type === 'edo') {
+                        oldHz = prevBaseHz * Math.pow(2, (num - baseMidi) / prevTuning.divisions);
+                    }
+
+                    // Converte esse Hertz para o step da NOVA configuração
+                    return Math.round(hzToMidi(oldHz));
+                }).join(', ');
+            };
+
+            if (isMicrotonalMode) {
+                // Atualiza silenciosamente todas as caixas de texto com os steps equivalentes na nova afinação
+                setTab2InputA(prev => translateString(prev));
+                setTab2InputB(prev => translateString(prev));
+                setTab3Input(prev => translateString(prev));
+                setTab4Input(prev => translateString(prev));
+                setTab5Input(prev => translateString(prev));
+                setTab6Input(prev => translateString(prev));
+                setTab9Input(prev => translateString(prev));
+                setTab10InputA(prev => translateString(prev));
+                setTab10InputB(prev => translateString(prev));
+            }
+
+            prevTuningRef.current = activeTuning;
+            prevHzRef.current = baseHz;
+        }
+    }, [activeTuning, baseHz, isMicrotonalMode]);
     // SINCRONIZA AS FERRAMENTAS 9 E 10 COM A REDE 3D
     useEffect(() => {
         if (activeTool === 9) {
@@ -679,6 +793,18 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             setSelectedSet(newSet);
         }
     }, [tab9ResultHz, tab10ResultHz, activeTool, points]);
+    // Sincroniza os Eixos da Rede 3D ao mudar de modo (Steps <-> Cents)
+    useEffect(() => {
+        if (isMicrotonalMode) {
+            setIntX(x => x * 100);
+            setIntY(y => y * 100);
+            setIntZ(z => z * 100);
+        } else {
+            setIntX(x => Math.round(x / 100));
+            setIntY(y => Math.round(y / 100));
+            setIntZ(z => Math.round(z / 100));
+        }
+    }, [isMicrotonalMode]);
     // ATALHO DE TECLADO: Alt + Setas para mover a última nota inserida
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -771,6 +897,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                 stopAudio(); // Opcional: manter ou parar o som
             }
         }
+
     }, [lastEvent]);
     // RESTAURANDO OS BOTÕES DE PUXAR:
     const PullButtons = ({ onPull }) => (
@@ -877,8 +1004,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <button onClick={() => setTab2InputA("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado (A)</button>
                                 </div>
                             </div>
-                            {viewMode === 'roll' ? <BachRollVisualizer notes={tab2ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={tab2NonTemp} onKeyClick={m => setTab2InputA(prev => prev ? prev + ", " + m : String(m))} /> : <GrandStaffVisualizer notes={tab2ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={tab2NonTemp} onKeyClick={m => setTab2InputA(prev => prev ? prev + ", " + m : String(m))} />}
-                        </div>
+                            {viewMode === 'roll' ? <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab2ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={tab2NonTemp} onKeyClick={m => handleStaffClick(m, setTab2InputA)} /> : <GrandStaffVisualizer notes={tab2ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={tab2NonTemp} onKeyClick={m => handleStaffClick(m, setTab2InputA)} />}                        </div>
                     </div>
                 )}
 
@@ -908,7 +1034,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <button onClick={() => setTab3Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
                                 </div>
                             </div>
-                            {viewMode === 'roll' ? <BachRollVisualizer notes={tab3ResultHz.map(hzToMidi)} isSequence={true} onKeyClick={m => setTab3Input(prev => prev ? prev + ", " + m : String(m))} onNoteDrag={(idx, m) => { let a = [...tab3ParsedInput]; if (idx < a.length) { a[idx] = m; setTab3Input(a.join(', ')); } }} originalEntityLength={tab3ParsedInput.length} onNoteDelete={(idx) => { let a = [...tab3ParsedInput]; if (idx < a.length) { a.splice(idx, 1); setTab3Input(a.join(', ')); } }} /> : <GrandStaffVisualizer notes={tab3ResultHz.map(hzToMidi)} isSequence={true} onKeyClick={m => setTab3Input(prev => prev ? prev + ", " + m : String(m))} />}
+                            {viewMode === 'roll' ? <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab3ResultHz.map(hzToStandardMidi)} isSequence={true} onKeyClick={m => handleStaffClick(m, setTab3Input)} onNoteDrag={(idx, m) => { let a = [...tab3ParsedInput]; if (idx < a.length) { a[idx] = m; setTab3Input(a.join(', ')); } }} originalEntityLength={tab3ParsedInput.length} onNoteDelete={(idx) => { let a = [...tab3ParsedInput]; if (idx < a.length) { a.splice(idx, 1); setTab3Input(a.join(', ')); } }} /> : <GrandStaffVisualizer notes={tab3ResultHz.map(hzToStandardMidi)} isSequence={true} onKeyClick={m => handleStaffClick(m, setTab3Input)} />}
                         </div>
                     </div>
                 )}
@@ -920,11 +1046,20 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                             <PullButtons onPull={setTab4Input} />
                             <textarea value={tab4Input} onChange={e => setTab4Input(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[80px]" placeholder="Entidade base..." />
                             <button onClick={() => setTab4Input("")} className="bg-red-900 text-[10px] w-full py-1.5 rounded">Limpar Entrada</button>
-                            <div className="border-t border-gray-700 pt-3 space-y-3">
+                            <div className="border-t border-gray-700 pt-3 space-y-3 mb-3">
                                 <button onClick={() => { let arr = parseAdvancedToHz(tab4Input); if (arr.length > 0) { setTargetMinHz(Math.min(...arr).toFixed(2)); setTargetMaxHz(Math.max(...arr).toFixed(2)); } }} className="w-full bg-purple-800 text-[10px] py-1 rounded">Normalizar Espaço</button>
                                 <div><label className="text-[10px] text-gray-300">Min: {targetMinHz} Hz</label><input type="range" min="20" max="2000" value={targetMinHz} onChange={e => setTargetMinHz(Number(e.target.value))} className="w-full accent-blue-500" /></div>
                                 <div><label className="text-[10px] text-gray-300">Max: {targetMaxHz} Hz</label><input type="range" min="20" max="10000" value={targetMaxHz} onChange={e => setTargetMaxHz(Number(e.target.value))} className="w-full accent-blue-500" /></div>
                             </div>
+                            <button
+                                onClick={() => {
+                                    const snapped = tab4ResultHz.map(hz => midiToHz(Math.round(hzToMidi(hz))));
+                                    setTab4Input(snapped.map(hz => hz.toFixed(2) + "Hz").join(", "));
+                                }}
+                                className="w-full bg-indigo-700 hover:bg-indigo-600 text-white text-[10px] py-1.5 rounded shadow transition mb-2"
+                            >
+                                Quantizar e Substituir (Snap to Grid)
+                            </button>
                             <UniversalOutput hzArray={tab4ResultHz} title="Projeção" isSimultaneous={true} showMelody={true} />
                         </div>
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
@@ -935,7 +1070,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <button onClick={() => setTab4Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
                                 </div>
                             </div>
-                            {viewMode === 'roll' ? <BachRollVisualizer notes={tab4MidiEquivalents} isSequence={true} isMicrotonal={true} onKeyClick={m => setTab4Input(prev => prev ? prev + ", " + m : String(m))} onNoteDelete={(idx) => { let a = parseAdvancedToHz(tab4Input).map(hzToMidi); if (idx < a.length) { a.splice(idx, 1); setTab4Input(a.join(', ')); } }} /> : <GrandStaffVisualizer notes={tab4MidiEquivalents} isSequence={true} isMicrotonal={true} onKeyClick={m => setTab4Input(prev => prev ? prev + ", " + m : String(m))} />}
+                            {viewMode === 'roll' ? <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab4ResultHz.map(hzToStandardMidi)} isSequence={true} isMicrotonal={true} onKeyClick={m => handleStaffClick(m, setTab4Input)} /> : <GrandStaffVisualizer notes={tab4ResultHz.map(hzToStandardMidi)} isSequence={true} isMicrotonal={true} onKeyClick={m => handleStaffClick(m, setTab4Input)} />}
                         </div>
                     </div>
                 )}
@@ -1005,7 +1140,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <button onClick={() => setTab6Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
                                 </div>
                             </div>
-                            {viewMode === 'roll' ? <BachRollVisualizer notes={tab6ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab6Input(prev => prev ? prev + ", " + m : String(m))} /> : <GrandStaffVisualizer notes={tab6ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab6Input(prev => prev ? prev + ", " + m : String(m))} />}
+                            {viewMode === 'roll' ? <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab6ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => handleStaffClick(m, setTab6Input)} /> : <GrandStaffVisualizer notes={tab6ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => handleStaffClick(m, setTab6Input)} />}
                         </div>
                     </div>
                 )}
@@ -1033,7 +1168,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <button onClick={() => setTab7Carrier("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado (C)</button>
                                 </div>
                             </div>
-                            {viewMode === 'roll' ? <BachRollVisualizer notes={tab7ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab7Carrier(prev => prev ? prev + ", " + m : String(m))} /> : <GrandStaffVisualizer notes={tab7ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab7Carrier(prev => prev ? prev + ", " + m : String(m))} />}
+                            {viewMode === 'roll' ? <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab7ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => handleStaffClick(m, setTab7Carrier)} /> : <GrandStaffVisualizer notes={tab7ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => handleStaffClick(m, setTab7Carrier)} />}
                         </div>
                     </div>
                 )}
@@ -1045,10 +1180,19 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                             <PullButtons onPull={setTab8Input} />
                             <textarea value={tab8Input} onChange={e => setTab8Input(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[80px]" placeholder="Fundamentais..." />
                             <button onClick={() => setTab8Input("")} className="bg-red-900 text-[10px] w-full py-1.5 rounded">Limpar Pauta</button>
-                            <div className="flex justify-around py-2 border-y border-gray-700 mt-2">
+                            <div className="flex justify-around py-2 border-y border-gray-700 mt-2 mb-3">
                                 <Knob value={tab8Harmonics} min={1} max={16} step={1} onChange={setTab8Harmonics} label="Harmônicos" />
                                 <Knob value={tab8Sub} min={1} max={8} step={1} onChange={setTab8Sub} label="Sub-Harm" />
                             </div>
+                            <button
+                                onClick={() => {
+                                    const snapped = tab8ResultHz.map(hz => midiToHz(Math.round(hzToMidi(hz))));
+                                    setTab8Input(snapped.map(hz => hz.toFixed(2) + "Hz").join(", "));
+                                }}
+                                className="w-full bg-indigo-700 hover:bg-indigo-600 text-white text-[10px] py-1.5 rounded shadow transition mb-2"
+                            >
+                                Quantizar Espectro (Snap to Grid)
+                            </button>
                             <UniversalOutput hzArray={tab8ResultHz} title="Espectro Aditivo" isSimultaneous={true} showMelody={true} />
                         </div>
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
@@ -1059,7 +1203,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <button onClick={() => setTab8Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
                                 </div>
                             </div>
-                            {viewMode === 'roll' ? <BachRollVisualizer notes={tab8ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab8Input(prev => prev ? prev + ", " + m : String(m))} /> : <GrandStaffVisualizer notes={tab8ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => setTab8Input(prev => prev ? prev + ", " + m : String(m))} />}
+                            {viewMode === 'roll' ? <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab8ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => handleStaffClick(m, setTab8Input)} /> : <GrandStaffVisualizer notes={tab8ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={true} onKeyClick={m => handleStaffClick(m, setTab8Input)} />}
                         </div>
                     </div>
                 )}
@@ -1115,8 +1259,8 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                 </div>
                                 <div className="flex-1 shadow-2xl rounded overflow-hidden border border-gray-700 bg-gray-900 bg-opacity-90 backdrop-blur-sm">
                                     {viewMode === 'roll' ?
-                                        <BachRollVisualizer notes={tab9ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={false} onKeyClick={m => setTab9Input(prev => prev ? prev + ", " + m : String(m))} /> :
-                                        <GrandStaffVisualizer notes={tab9ResultHz.map(hzToMidi)} isSequence={false} isMicrotonal={false} onKeyClick={m => setTab9Input(prev => prev ? prev + ", " + m : String(m))} />}
+                                        <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab9ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={false} onKeyClick={m => handleStaffClick(m, setTab9Input)} /> :
+                                        <GrandStaffVisualizer notes={tab9ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={false} onKeyClick={m => handleStaffClick(m, setTab9Input)} />}
                                 </div>
                             </div>
                         </div>
@@ -1181,8 +1325,8 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
                                 <div className="flex-1 shadow-2xl rounded overflow-hidden border border-gray-700 bg-gray-900 bg-opacity-90 backdrop-blur-sm">
                                     {viewMode === 'roll' ?
-                                        <BachRollVisualizer notes={tab10ResultHz.map(hzToMidi)} isSequence={tab10Mode === 'melody'} isMicrotonal={false} onKeyClick={m => setTab10InputA(prev => prev ? prev + ", " + m : String(m))} /> :
-                                        <GrandStaffVisualizer notes={tab10ResultHz.map(hzToMidi)} isSequence={tab10Mode === 'melody'} isMicrotonal={false} onKeyClick={m => setTab10InputA(prev => prev ? prev + ", " + m : String(m))} />
+                                        <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab10ResultHz.map(hzToStandardMidi)} isSequence={tab10Mode === 'melody'} isMicrotonal={false} onKeyClick={m => handleStaffClick(m, setTab10InputA)} /> :
+                                        <GrandStaffVisualizer notes={tab10ResultHz.map(hzToStandardMidi)} isSequence={tab10Mode === 'melody'} isMicrotonal={false} onKeyClick={m => handleStaffClick(m, setTab10InputA)} />
                                     }
                                 </div>
                             </div>
@@ -1190,71 +1334,114 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     </div>
                 )}
 
-                {/* ABA 11: AFINAÇÕES E TEMPERAMENTOS (SCALA & EDO) */}
+                {/* ABA 11: AFINAÇÕES E TEMPERAMENTOS (O NOVO SCALE WORKSHOP) */}
                 {activeTool === 11 && (
                     <div className="flex w-full h-full bg-gray-800">
-                        <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
-                            <div className="flex bg-gray-800 rounded border border-gray-600 overflow-hidden mb-2">
-                                <button onClick={() => setTab11Mode('edo')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab11Mode === 'edo' ? 'bg-[#00ffcc] text-black' : 'text-gray-400 hover:bg-gray-700'}`}>EDO / TET</button>
-                                <button onClick={() => setTab11Mode('scala')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab11Mode === 'scala' ? 'bg-[#00ffcc] text-black' : 'text-gray-400 hover:bg-gray-700'}`}>Arquivo .SCL</button>
+                        <div className="w-[320px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-4 overflow-y-auto custom-scrollbar">
+
+                            {/* BLOCO 1: GERADOR DE ESCALAS */}
+                            <div>
+                                <h3 className="text-[#00ffcc] font-bold text-[10px] uppercase mb-2 tracking-wider">Gerador de Escalas</h3>
+                                <div className="flex bg-gray-800 rounded border border-gray-600 overflow-hidden mb-3">
+                                    <button onClick={() => setTab11Mode('edo')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab11Mode === 'edo' ? 'bg-[#00ffcc] text-black' : 'text-gray-400 hover:bg-gray-700'}`}>EDO</button>
+                                    <button onClick={() => setTab11Mode('custom')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab11Mode === 'custom' ? 'bg-[#00ffcc] text-black' : 'text-gray-400 hover:bg-gray-700'}`}>JI / Texto</button>
+                                    <button onClick={() => setTab11Mode('scala')} className={`flex-1 text-[9px] font-bold py-1.5 ${tab11Mode === 'scala' ? 'bg-[#00ffcc] text-black' : 'text-gray-400 hover:bg-gray-700'}`}>.SCL</button>
+                                </div>
+
+                                {tab11Mode === 'edo' && (
+                                    <div className="space-y-2 bg-gray-950 p-3 rounded border border-gray-700">
+                                        <label className="text-[10px] text-gray-400">Divisões Iguais da Oitava (EDO):</label>
+                                        <input type="number" min="1" max="120" value={tab11Edo} onChange={e => setTab11Edo(Number(e.target.value))} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono text-white" />
+                                        <button onClick={() => { setActiveTuning({ type: 'edo', divisions: tab11Edo }); if (!isMicrotonalMode) toggleMicrotonalMode(); }} className="w-full bg-blue-700 hover:bg-blue-600 text-white text-[10px] py-2 rounded transition font-bold shadow-lg">Aplicar {tab11Edo}-EDO</button>
+                                    </div>
+                                )}
+
+                                {tab11Mode === 'custom' && (
+                                    <div className="space-y-2 bg-gray-950 p-3 rounded border border-gray-700">
+                                        <div className="flex flex-wrap gap-1 mb-2">
+                                            <button onClick={() => { const text = "9/8\n5/4\n4/3\n3/2\n5/3\n15/8\n2/1"; const parsed = parseCustomTuning(text); setActiveTuning({ type: 'scala', data: parsed }); if (!isMicrotonalMode) toggleMicrotonalMode(); }} className="text-[8px] bg-purple-900 hover:bg-purple-800 px-1.5 py-1 rounded">5-Limit JI</button>
+                                            <button onClick={() => { const text = "9/8\n6/5\n4/3\n3/2\n8/5\n7/4\n2/1"; const parsed = parseCustomTuning(text); setActiveTuning({ type: 'scala', data: parsed }); if (!isMicrotonalMode) toggleMicrotonalMode(); }} className="text-[8px] bg-purple-900 hover:bg-purple-800 px-1.5 py-1 rounded">7-Limit Min</button>
+                                            <button onClick={() => { const text = "9/8\n10/8\n11/8\n12/8\n13/8\n14/8\n15/8\n16/8"; const parsed = parseCustomTuning(text); setActiveTuning({ type: 'scala', data: parsed }); if (!isMicrotonalMode) toggleMicrotonalMode(); }} className="text-[8px] bg-purple-900 hover:bg-purple-800 px-1.5 py-1 rounded">Harm 8-16</button>
+                                            <button onClick={() => { const text = "27/25\n25/21\n9/7\n7/5\n75/49\n5/3\n9/5\n49/25\n15/7\n7/3\n63/25\n25/9\n3/1"; const parsed = parseCustomTuning(text); setActiveTuning({ type: 'scala', data: { ...parsed, description: "Bohlen-Pierce" } }); if (!isMicrotonalMode) toggleMicrotonalMode(); }} className="text-[8px] bg-purple-900 hover:bg-purple-800 px-1.5 py-1 rounded">Bohlen-Pierce</button>
+                                        </div>
+                                        <label className="text-[10px] text-gray-400 block">Escreva Frações, Cents ou N\M:</label>
+                                        <textarea placeholder="Ex:\n9/8\n701.955\n7\19\n2/1" className="w-full h-24 bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono text-white custom-scrollbar" id="customTuningInput" />
+                                        <button onClick={() => { const text = document.getElementById('customTuningInput').value; if (text) { const parsed = parseCustomTuning(text); setActiveTuning({ type: 'scala', data: parsed }); if (!isMicrotonalMode) toggleMicrotonalMode(); } }} className="w-full bg-blue-700 hover:bg-blue-600 text-white text-[10px] py-2 rounded transition font-bold shadow-lg">Interpretar e Aplicar</button>
+                                    </div>
+                                )}
+
+                                {tab11Mode === 'scala' && (
+                                    <div className="space-y-2 bg-gray-950 p-3 rounded border border-gray-700">
+                                        <label className="text-[10px] text-gray-400">Importar arquivo Scala (.scl):</label>
+                                        <input type="file" accept=".scl" onChange={(e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (evt) => setTab11ScalaData(parseScalaFile(evt.target.result)); reader.readAsText(file); } }} className="w-full text-[9px] text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[9px] file:bg-gray-700 file:text-white hover:file:bg-gray-600 cursor-pointer" />
+                                        {tab11ScalaData && <button onClick={() => { setActiveTuning({ type: 'scala', data: tab11ScalaData }); if (!isMicrotonalMode) toggleMicrotonalMode(); }} className="w-full bg-blue-700 hover:bg-blue-600 text-white text-[10px] py-2 rounded transition font-bold mt-2 shadow-lg">Aplicar Afinação Scala</button>}
+                                    </div>
+                                )}
                             </div>
 
-                            {tab11Mode === 'edo' && (
-                                <div className="space-y-2">
-                                    <label className="text-[10px] text-gray-400">Divisões Iguais da Oitava (EDO):</label>
-                                    <input type="number" min="1" max="120" value={tab11Edo} onChange={e => setTab11Edo(Number(e.target.value))} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono" />
-                                    <button
-                                        onClick={() => { setActiveTuning({ type: 'edo', divisions: tab11Edo }); if (!isMicrotonalMode) toggleMicrotonalMode(); }}
-                                        className="w-full bg-blue-700 hover:bg-blue-600 text-white text-[10px] py-2 rounded transition font-bold shadow-lg"
-                                    >
-                                        Aplicar {tab11Edo}-EDO Global
-                                    </button>
+                            {/* BLOCO 2: TUNING (ÂNCORAS) */}
+                            <div className="pt-2 border-t border-gray-700">
+                                <h3 className="text-orange-400 font-bold text-[10px] uppercase mb-2 tracking-wider">Tuning (Âncoras)</h3>
+                                <div className="grid grid-cols-2 gap-2 bg-gray-950 p-3 rounded border border-gray-700">
+                                    <div>
+                                        <label className="text-[9px] text-gray-500">MIDI Âncora:</label>
+                                        <input
+                                            type="number"
+                                            value={baseMidi}
+                                            onChange={(e) => {
+                                                const novoMidi = Number(e.target.value);
+                                                setBaseMidi(novoMidi);
+                                                // O Hz acompanha o MIDI usando a matemática 12-TET universal
+                                                setBaseHz(Number((440 * Math.pow(2, (novoMidi - 69) / 12)).toFixed(6)));
+                                            }}
+                                            className="w-full bg-gray-800 text-xs p-1 rounded border border-gray-600 text-white text-center mt-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] text-gray-500">Hertz (Hz):</label>
+                                        <input type="number" step="any" value={baseHz} onChange={(e) => setBaseHz(Number(e.target.value))} className="w-full bg-gray-800 text-xs p-1 rounded border border-gray-600 text-white text-center mt-1" />
+                                    </div>
+                                    <div className="col-span-2 mt-1">
+                                        <button onClick={() => { setBaseMidi(60); setBaseHz(261.625565); }} className="text-[8px] w-full bg-gray-700 hover:bg-gray-600 py-1 rounded">Resetar para C4 (60) = 261.62 Hz</button>
+                                    </div>
                                 </div>
-                            )}
+                            </div>
 
-                            {tab11Mode === 'scala' && (
-                                <div className="space-y-2">
-                                    <label className="text-[10px] text-gray-400">Importar arquivo Scala (.scl):</label>
-                                    <input
-                                        type="file"
-                                        accept=".scl"
-                                        onChange={(e) => {
-                                            const file = e.target.files[0];
-                                            if (file) {
-                                                const reader = new FileReader();
-                                                reader.onload = (evt) => setTab11ScalaData(parseScalaFile(evt.target.result));
-                                                reader.readAsText(file);
-                                            }
-                                        }}
-                                        className="w-full text-[9px] text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[9px] file:bg-gray-700 file:text-white hover:file:bg-gray-600 cursor-pointer"
-                                    />
-                                    {tab11ScalaData && (
-                                        <button
-                                            onClick={() => { setActiveTuning({ type: 'scala', data: tab11ScalaData }); if (!isMicrotonalMode) toggleMicrotonalMode(); }}
-                                            className="w-full bg-blue-700 hover:bg-blue-600 text-white text-[10px] py-2 rounded transition font-bold mt-2 shadow-lg"
-                                        >
-                                            Aplicar Afinação Scala Global
-                                        </button>
+                            {/* BLOCO 3: CORES DO TECLADO */}
+                            <div className="pt-2 border-t border-gray-700">
+                                <h3 className="text-pink-400 font-bold text-[10px] uppercase mb-2 tracking-wider">Key Colors (Teclas)</h3>
+                                <div className="space-y-2 bg-gray-950 p-3 rounded border border-gray-700">
+                                    <select value={keyColorMode} onChange={(e) => setKeyColorMode(e.target.value)} className="w-full bg-gray-800 text-[10px] p-1.5 rounded border border-gray-600 text-white">
+                                        <option value="auto">Automático (Calculado pelo EDO)</option>
+                                        <option value="12-tet">Piano Clássico (12-TET)</option>
+                                        <option value="custom">Personalizado (W/B)</option>
+                                    </select>
+                                    {keyColorMode === 'custom' && (
+                                        <div>
+                                            <label className="text-[8px] text-gray-500">Use 'W' (Branca) e 'B' (Preta) separadas por vírgula:</label>
+                                            <input type="text" value={customKeyPattern.join(',')} onChange={(e) => setCustomKeyPattern(e.target.value.toUpperCase().split(',').map(s => s.trim()))} className="w-full bg-gray-800 text-xs p-1.5 rounded border border-gray-600 text-white font-mono mt-1" />
+                                        </div>
                                     )}
                                 </div>
-                            )}
+                            </div>
 
                             <div className="mt-auto pt-4 border-t border-gray-700">
                                 <div className="text-[10px] text-gray-400 mb-1">Afinação Global Ativa:</div>
                                 <div className="bg-gray-950 p-2 rounded border border-gray-700 text-[#00ffcc] font-mono text-[10px] font-bold shadow-inner">
-                                    {activeTuning.type === 'edo' ? `${activeTuning.divisions}-EDO (TET)` : `Scala: ${activeTuning.data?.description || 'Carregada'}`}
+                                    {activeTuning.type === 'edo' ? `${activeTuning.divisions}-EDO (TET)` : `Custom/Scala: ${activeTuning.data?.description || 'Carregada'}`}
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 overflow-auto custom-scrollbar">
-                            <h3 className="text-[#00ffcc] font-bold mb-4 uppercase tracking-widest border-b border-gray-800 pb-2 flex justify-between">
+                            <h3 className="text-[#00ffcc] font-bold mb-4 uppercase tracking-widest border-b border-gray-800 pb-2 flex justify-between items-center">
                                 <span>Painel de Análise da Afinação</span>
+                                <span className="text-[10px] text-gray-500 bg-gray-900 px-2 py-1 rounded border border-gray-700">Âncora: {baseMidi} = {baseHz} Hz</span>
                             </h3>
 
-                            {tab11Mode === 'edo' ? (
+                            {activeTuning.type === 'edo' ? (
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                                    {generateEdoScale(tab11Edo).map((step, i) => (
+                                    {generateEdoScale(activeTuning.divisions).map((step, i) => (
                                         <div key={i} className="bg-gray-900 p-3 rounded border border-gray-800 text-center shadow">
                                             <div className="text-gray-500 text-[10px] uppercase">Grau {i + 1}</div>
                                             <div className="text-white font-mono text-sm">{step.cents.toFixed(2)}c</div>
@@ -1263,31 +1450,27 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     ))}
                                 </div>
                             ) : (
-                                tab11ScalaData ? (
+                                activeTuning.data && (
                                     <div className="space-y-4">
                                         <div className="bg-gray-900 p-4 rounded border border-gray-800 shadow">
-                                            <div className="text-gray-400 text-xs mb-1 uppercase font-bold tracking-wider">Descrição Interna (.scl):</div>
-                                            <div className="text-white font-serif italic mb-2">"{tab11ScalaData.description}"</div>
-                                            <div className="text-gray-400 text-[10px]">Total de Notas na Oitava: <span className="text-[#00ffcc] font-bold">{tab11ScalaData.numNotes}</span></div>
+                                            <div className="text-gray-400 text-xs mb-1 uppercase font-bold tracking-wider">Descrição Interna:</div>
+                                            <div className="text-white font-serif italic mb-2">"{activeTuning.data.description}"</div>
+                                            <div className="text-gray-400 text-[10px]">Total de Notas na Estrutura: <span className="text-[#00ffcc] font-bold">{activeTuning.data.numNotes}</span></div>
                                         </div>
                                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                                            <div className="bg-gray-900 p-3 rounded border border-gray-800 text-center shadow">
+                                            <div className="bg-gray-900 p-3 rounded border border-gray-800 text-center shadow border-t-2 border-t-orange-400">
                                                 <div className="text-gray-500 text-[10px] uppercase">Grau 0 (Tônica)</div>
                                                 <div className="text-white font-mono text-sm">0.00c</div>
-                                                <div className="text-blue-400 font-mono text-[10px]">Ratio: 1 / 1</div>
+                                                <div className="text-orange-400 font-mono text-[10px]">1 / 1</div>
                                             </div>
-                                            {tab11ScalaData.scale.map((step, i) => (
+                                            {activeTuning.data.scale.map((step, i) => (
                                                 <div key={i} className="bg-gray-900 p-3 rounded border border-gray-800 text-center shadow">
                                                     <div className="text-gray-500 text-[10px] uppercase">Grau {i + 1}</div>
                                                     <div className="text-white font-mono text-sm">{step.cents.toFixed(2)}c</div>
-                                                    <div className="text-blue-400 font-mono text-[10px]">Ratio: {step.type === 'ratio' ? step.ratioStr : (step.ratio).toFixed(3)}</div>
+                                                    <div className="text-blue-400 font-mono text-[10px]">{step.original || step.ratioStr || (step.ratio).toFixed(3)}</div>
                                                 </div>
                                             ))}
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-center h-full">
-                                        <span className="text-gray-600 text-sm font-bold uppercase tracking-widest border border-dashed border-gray-700 p-8 rounded-lg">Aguardando arquivo Scala...</span>
                                     </div>
                                 )
                             )}
@@ -1375,7 +1558,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                 {Array.from({ length: 49 }, (_, i) => i + 36).map(m => {
                                     const isActive = activeMidiNotes.has(m);
                                     const hz = midiToHz(m);
-                                    const isBlack = [1, 3, 6, 8, 10].includes(m % 12);
+                                    const isBlack = getIsBlackKey(m);
 
                                     return (
                                         <div

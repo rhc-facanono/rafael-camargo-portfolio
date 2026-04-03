@@ -4,31 +4,60 @@ import { useTuning } from '../../context/TuningContext';
 export default function GrandStaffVisualizer({ notes = [], isSequence = false, isMicrotonal = false, onKeyClick = null }) {
     const { accidentalModifier } = useTuning();
 
+    const spacing = 30;
     const xMultiplier = isSequence ? 40 : 14;
     const svgWidth = Math.max(800, 60 + notes.length * xMultiplier + 100);
-    const svgHeight = 300, lineSpacing = 10, baseY = 150;
+    const svgHeight = 300;
 
-    const handleSvgClick = (e) => {
-        if (!onKeyClick || !(e.ctrlKey || e.metaKey)) return;
-        const rect = e.currentTarget.getBoundingClientRect();
+    // Converte um número MIDI 12-TET em coordenada Y na partitura
+    const midiToStaffPos = (midi) => {
+        const pc = ((Math.round(midi) % 12) + 12) % 12;
+        const oct = Math.floor(Math.round(midi) / 12) - 1;
+        const whiteKeys = [0, 2, 4, 5, 7, 9, 11];
 
-        // Calcula a linha/espaço clicado
-        const step = Math.round((baseY - (e.clientY - rect.top)) / (lineSpacing / 2));
-        const oct = Math.floor(step / 7) + 4;
-        const pcStep = ((step % 7) + 7) % 7;
-        const diatonicToMidi = [0, 2, 4, 5, 7, 9, 11];
+        let basePc = pc;
+        if (!whiteKeys.includes(pc)) basePc = pc - 1; // Tecla preta desenha na linha da branca abaixo
 
-        // Calcula o MIDI base da linha e adiciona o modificador (Sustenido, Bemol, Quarto-de-tom)
-        const finalMidi = (oct + 1) * 12 + diatonicToMidi[pcStep] + accidentalModifier;
-        onKeyClick(finalMidi);
+        const diatonicIndex = whiteKeys.indexOf(basePc) + (oct * 7);
+
+        // No seu SVG, o Dó Central (C4) fica no Y = 150
+        const yC4 = 150;
+        const stepY = 5; // Cada nota sobe/desce 5px
+
+        const y = yC4 - (diatonicIndex - 28) * stepY;
+
+        const ledgerLines = [];
+        // Linhas suplementares superiores (Y <= 90)
+        if (y <= 90) { for (let ly = 90; ly >= y; ly -= 10) ledgerLines.push(ly); }
+        // Linhas suplementares inferiores (Y >= 210)
+        if (y >= 210) { for (let ly = 210; ly <= y; ly += 10) ledgerLines.push(ly); }
+        // O Dó Central (Y=150) tem sua própria linha
+        if (y === 150) ledgerLines.push(150);
+
+        return { y, ledgerLines };
     };
 
-    const getDiatonicInfo = (midi) => {
-        const pc = Math.round(midi) % 12, oct = Math.floor(midi / 12) - 1;
-        const diatonicMap = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
-        const accidentalMap = ['', '#', '', '#', '', '', '#', '', '#', '', '#', ''];
-        // Se a nota tiver decimais (microtom), força a visualização do '+' 
-        return { step: diatonicMap[pc] + (oct - 4) * 7, acc: (midi % 1 !== 0) ? '+' : accidentalMap[pc] };
+    const handleSvgClick = (e) => {
+        if (!onKeyClick) return;
+        // Exige segurar Ctrl ou Cmd para desenhar, mantendo o seu padrão original
+        if (!(e.ctrlKey || e.metaKey)) return;
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+
+        const yC4 = 150;
+        const stepY = 5;
+        const diatonicIndex = Math.round((yC4 - y) / stepY) + 28;
+
+        const oct = Math.floor(diatonicIndex / 7);
+        const degree = diatonicIndex % 7;
+        const whiteKeys = [0, 2, 4, 5, 7, 9, 11];
+
+        if (degree >= 0 && degree < 7) {
+            const baseMidi = whiteKeys[degree] + (oct + 1) * 12;
+            const finalMidi = baseMidi + (accidentalModifier || 0); // Soma Bemol/Sustenido se ativado
+            onKeyClick(finalMidi);
+        }
     };
 
     return (
@@ -43,23 +72,63 @@ export default function GrandStaffVisualizer({ notes = [], isSequence = false, i
             <div className="flex-1 min-w-0 overflow-auto custom-scrollbar" style={{ cursor: onKeyClick ? 'crosshair' : 'default' }}>
                 <svg width={svgWidth} height={svgHeight} style={{ minWidth: `${svgWidth}px`, display: 'block' }} onPointerDown={handleSvgClick}>
                     {[100, 110, 120, 130, 140, 160, 170, 180, 190, 200].map(y => <line key={`line-${y}`} x1="0" y1={y} x2="100%" y2={y} stroke="#333" strokeWidth="1" />)}
+
                     {notes.map((midi, idx) => {
-                        const info = getDiatonicInfo(midi), y = baseY - (info.step * (lineSpacing / 2)), x = 20 + (idx * xMultiplier);
-                        const ledgers = [];
-                        if (y <= 90) { for (let l = 90; l >= y; l -= 10) ledgers.push(l); }
-                        if (y === 150) ledgers.push(150);
-                        if (y >= 210) { for (let l = 210; l <= y; l += 10) ledgers.push(l); }
+                        const roundedMidi = Math.round(midi);
+                        const pos = midiToStaffPos(roundedMidi);
+                        if (!pos) return null;
+
+                        const isAccidental = [1, 3, 6, 8, 10].includes(((roundedMidi % 12) + 12) % 12);
+
+                        // LÓGICA DE ESPAÇAMENTO PARA ACORDES (Evitar Sobreposição)
+                        let xOffset = 0;
+                        if (!isSequence && idx > 0) {
+                            // Se a nota anterior está a menos de 3 semitons de distância, empurra um pouco pro lado
+                            const prevMidi = Math.round(notes[idx - 1]);
+                            if (Math.abs(roundedMidi - prevMidi) <= 2) {
+                                xOffset = (idx % 2 === 1) ? 15 : 0; // Ziguezagueia as notas juntas
+                            }
+                        }
+
+                        const x = (isSequence ? 60 + (idx * spacing) : 80) + xOffset;
+                        const color = isMicrotonal ? "#ff4757" : "#000000";
+
+                        const cents = Math.round((midi - roundedMidi) * 100);
+                        const showCents = isMicrotonal && cents !== 0;
+
                         return (
-                            <g key={`note-${idx}`}>
-                                {ledgers.map(ly => <line key={`l-${idx}-${ly}`} x1={x - 12} y1={ly} x2={x + 12} y2={ly} stroke="#333" strokeWidth="1.5" />)}
-                                {info.acc && <text x={x - 16} y={y + 4} fontSize="14" fill="#222" fontWeight="bold">{info.acc}</text>}
-                                <ellipse cx={x} cy={y} rx="7" ry="5" fill={isMicrotonal ? "#c0392b" : "#2980b9"} transform={`rotate(-15 ${x} ${y})`} />
-                                {/* Renderiza o valor em formato decimal para microtons */}
-                                {isMicrotonal && <text x={x - 5} y={y - 12} fontSize="9" fill="#c0392b" fontWeight="bold">{midi.toFixed(2)}</text>}
+                            <g key={idx}>
+                                {pos.ledgerLines.map((ly, lIdx) => (
+                                    <line key={`ledger-${idx}-${lIdx}`} x1={x - 12} y1={ly} x2={x + 12} y2={ly} stroke="#000" strokeWidth="1" />
+                                ))}
+                                {isAccidental && (
+                                    <text x={x - 15} y={pos.y + 4} fontSize="16" fontFamily="serif" fill={color}>#</text>
+                                )}
+                                <ellipse
+                                    cx={x}
+                                    cy={pos.y}
+                                    rx="6"
+                                    ry="4.5"
+                                    fill={color}
+                                    transform={`rotate(-15 ${x} ${pos.y})`}
+                                />
+
+                                {/* CENTS FLUTUANTES */}
+                                {showCents && (
+                                    <text
+                                        x={x}
+                                        y={pos.y - 12}
+                                        fontSize="10"
+                                        fontWeight="bold"
+                                        fill="#ff4757"
+                                        textAnchor="middle"
+                                    >
+                                        {cents > 0 ? `+${cents}c` : `${cents}c`}
+                                    </text>
+                                )}
                             </g>
                         );
-                    })}
-                </svg>
+                    })}               </svg>
             </div>
         </div>
     );
