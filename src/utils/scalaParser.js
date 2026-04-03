@@ -59,3 +59,56 @@ export function generateEdoScale(divisions) {
     }
     return scale;
 }
+// ==========================================
+// PARSER PARA CAIXA DE TEXTO LIVRE (JI, Cents, N\M)
+// ==========================================
+export function parseCustomTuning(text) {
+    // Permite separar os valores por quebra de linha, vírgula ou ponto e vírgula
+    const lines = text.split(/[\n,;]+/);
+    const scale = [];
+
+    for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+
+        if (line.includes('\\')) {
+            // Notação EDO / Step (ex: 7\19) -> 7 passos de 19-EDO
+            const parts = line.split('\\');
+            const n = parseFloat(parts[0]);
+            const m = parseFloat(parts[1]);
+            if (m) {
+                const cents = (n / m) * 1200;
+                const ratio = Math.pow(2, cents / 1200);
+                scale.push({ type: 'edo-step', cents: cents, ratio: ratio, original: line });
+            }
+        } else if (line.includes('.')) {
+            // Notação Cents (ex: 701.955)
+            const cents = parseFloat(line);
+            const ratio = Math.pow(2, cents / 1200);
+            scale.push({ type: 'cents', cents: cents, ratio: ratio, original: line });
+        } else if (line.includes('/')) {
+            // Notação Fração / Just Intonation (ex: 3/2)
+            const parts = line.split('/');
+            const num = parseFloat(parts[0]);
+            const den = parseFloat(parts[1]);
+            if (den) {
+                const ratio = num / den;
+                const cents = 1200 * Math.log2(ratio);
+                scale.push({ type: 'ratio', cents: cents, ratio: ratio, original: line });
+            }
+        } else {
+            // Se for apenas um número inteiro (ex: 3), trata como harmônico puro (3/1)
+            const num = parseInt(line, 10);
+            if (!isNaN(num)) {
+                const cents = 1200 * Math.log2(num);
+                scale.push({ type: 'harmonic', cents: cents, ratio: num, original: line });
+            }
+        }
+    }
+
+    return {
+        description: "Afinação Customizada (JI/Mista)",
+        numNotes: scale.length,
+        scale: scale
+    };
+}

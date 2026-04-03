@@ -1,22 +1,25 @@
 import React, { createContext, useState, useContext } from 'react';
 
-// Cria o contexto
 const TuningContext = createContext();
 
-// Hook customizado para facilitar o uso do contexto em qualquer arquivo
-export const useTuning = () => useContext(TuningContext);
-
-// Provedor que vai abraçar a nossa aplicação
-export const TuningProvider = ({ children }) => {
-    // 1. O Master Toggle: Liga/Desliga a Xenharmonia
+export function TuningProvider({ children }) {
     const [isMicrotonalMode, setIsMicrotonalMode] = useState(false);
 
-    // 2. A Afinação Ativa: Por padrão é 12-TET (12-EDO)
-    const [activeTuning, setActiveTuning] = useState({ type: 'edo', divisions: 12 });
+    // activeTuning agora pode ser 'edo', 'scala' ou 'custom' (para JI e outras)
+    const [activeTuning, setActiveTuning] = useState({ type: 'edo', divisions: 19, data: null });
 
-    // 3. Modificador de Acidentes da Partitura: 
-    // 0 = natural, 1 = sustenido, -1 = bemol, 0.5 = quarto-de-tom sustenido, etc.
-    const [accidentalModifier, setAccidentalModifier] = useState(0);
+    // ----------------------------------------------------
+    // NOVAS VARIÁVEIS DO SCALE WORKSHOP
+    // ----------------------------------------------------
+
+    // Âncoras de Frequência (Padrão: MIDI 60 = 261.625565 Hz)
+    const [baseMidi, setBaseMidi] = useState(60);
+    const [baseHz, setBaseHz] = useState(261.625565);
+
+    // Configuração das Cores das Teclas no Piano Roll / Teclado
+    const [keyColorMode, setKeyColorMode] = useState('auto'); // 'auto', '12-tet', 'custom'
+    // Array padrão de cores caso o usuário queira pintar manualmente (W = White, B = Black)
+    const [customKeyPattern, setCustomKeyPattern] = useState(['W', 'B', 'W', 'B', 'W', 'W', 'B', 'W', 'B', 'W', 'B', 'W']);
 
     const toggleMicrotonalMode = () => {
         setIsMicrotonalMode(prev => !prev);
@@ -24,14 +27,16 @@ export const TuningProvider = ({ children }) => {
 
     return (
         <TuningContext.Provider value={{
-            isMicrotonalMode,
-            toggleMicrotonalMode,
-            activeTuning,
-            setActiveTuning,
-            accidentalModifier,
-            setAccidentalModifier
+            isMicrotonalMode, toggleMicrotonalMode,
+            activeTuning, setActiveTuning,
+            baseMidi, setBaseMidi,
+            baseHz, setBaseHz,
+            keyColorMode, setKeyColorMode,
+            customKeyPattern, setCustomKeyPattern
         }}>
             {children}
         </TuningContext.Provider>
     );
-};
+}
+
+export const useTuning = () => useContext(TuningContext);
