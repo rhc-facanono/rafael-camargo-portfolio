@@ -280,13 +280,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     const {
         isMicrotonalMode, toggleMicrotonalMode, activeTuning, setActiveTuning,
         baseMidi, setBaseMidi, baseHz, setBaseHz,
-        keyColorMode, setKeyColorMode, customKeyPattern, setCustomKeyPattern
+        keyColorMode, setKeyColorMode, customKeyPattern, setCustomKeyPattern,
+        accidentalModifier, setAccidentalModifier, // Traz de volta os acidentes
+        globalSnap, setGlobalSnap                  // Traz de volta o Snap Global
     } = useTuning();
-
-    // ==========================================
-    // MOTORES DE FREQUÊNCIA (AGORA GLOBAIS E DINÂMICOS)
-    // ==========================================
-
     // ==========================================
     // MOTORES GLOBAIS COM ÂNCORAS DINÂMICAS E SNAP-TO-FREQ
     // ==========================================
@@ -347,41 +344,51 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         }
         return 69 + 12 * Math.log2(hz / 440);
     }
-
-    // Retorna a nota 12-TET mais próxima com o desvio em Cents (Ex: E4 -21c)
+    // APLICA A QUANTIZAÇÃO GLOBAL (Declarada como function para evitar ReferenceError)
+    function applySnap(hzArray) {
+        if (!globalSnap) return hzArray;
+        return hzArray.map(hz => midiToHz(Math.round(hzToMidi(hz))));
+    }
+    // Retorna a nota mais próxima com o desvio em Cents visível para TODOS os modos (Ex: E4 -50c)
     function midiToNote(m) {
         if (m === undefined || m === null) return "";
+
+        let stdMidi = m;
+        // Se estivermos no modo alienígena, calcula onde essa frequência cai no piano normal
         if (isMicrotonalMode) {
             const hz = midiToHz(m);
-            const stdMidi = 69 + 12 * Math.log2(hz / 440); // Onde essa freq cairia no piano normal?
-            const intM = Math.round(stdMidi);
-            const cents = Math.round((stdMidi - intM) * 100);
-            const name = noteNames[((intM % 12) + 12) % 12];
-            const oct = Math.floor(intM / 12) - 1;
-            const sign = cents > 0 ? '+' : '';
-            return `${name}${oct}${cents !== 0 ? ' ' + sign + cents + 'c' : ''}`;
+            stdMidi = 69 + 12 * Math.log2(hz / 440);
         }
-        const name = noteNames[((Math.round(m) % 12) + 12) % 12];
-        const oct = Math.floor(Math.round(m) / 12) - 1;
-        return name + oct;
+
+        const intM = Math.round(stdMidi);
+        const cents = Math.round((stdMidi - intM) * 100);
+        const name = noteNames[((intM % 12) + 12) % 12];
+        const oct = Math.floor(intM / 12) - 1;
+        const sign = cents > 0 ? '+' : '';
+        return `${name}${oct}${cents !== 0 ? ' ' + sign + cents + 'c' : ''}`;
     }
 
-    // Utilitário para os Visualizadores converterem Hertz em espaço físico Y no SVG
     const hzToStandardMidi = (hz) => 69 + 12 * Math.log2(hz / 440);
 
-    // O "Snap-to-Freq" do Pentagrama/Teclado!
+    // O "Snap-to-Freq" Inteligente (Agora respeita acidentes microtonais puros da Barra de Ferramentas!)
     const handleStaffClick = (clickedMidi12TET, setInputState) => {
         if (!isMicrotonalMode) {
             setInputState(prev => prev ? prev + ", " + clickedMidi12TET : String(clickedMidi12TET));
         } else {
-            // Qual a frequência física da linha que o usuário clicou?
             const targetHz = 440 * Math.pow(2, (clickedMidi12TET - 69) / 12);
-            // Qual degrau da nossa escala maluca está mais perto dessa frequência?
-            const nearestStep = Math.round(hzToMidi(targetHz));
-            setInputState(prev => prev ? prev + ", " + nearestStep : String(nearestStep));
+            let realHz = targetHz;
+
+            // Se a nota NÃO tiver casas decimais, significa que você clicou normalmente na pauta.
+            // Neste caso, fazemos o "Snap" para a nota mais próxima da afinação EDO atual.
+            if (Math.abs(clickedMidi12TET % 1) < 0.01) {
+                const nearestStep = Math.round(hzToMidi(targetHz));
+                realHz = midiToHz(nearestStep);
+            }
+
+            const formattedHz = realHz.toFixed(2) + "Hz";
+            setInputState(prev => prev ? prev + ", " + formattedHz : formattedHz);
         }
     };
-
     function parseAdvancedToHz(str) {
         if (!str) return [];
         const parts = str.split(/[,;\s]+/).filter(Boolean);
@@ -473,29 +480,42 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
     const tab1Hz = useMemo(() => points.filter(pt => selectedSet.has(pt.coord.join(','))).map(pt => midiToHz(pt.midi)).sort((a, b) => a - b), [points, selectedSet]);
 
+    // Motor da Aba 2 (Sempre calcula e transpõe na grade da afinação global atual)
     const tab2ResultHz = useMemo(() => {
         let hzA = parseAdvancedToHz(tab2InputA), hzB = parseAdvancedToHz(tab2InputB), res = new Set();
         if (!hzA.length || !hzB.length) return [];
-        if (tab2NonTemp) { hzB.forEach(b => { let ratio = b / hzB[0]; hzA.forEach(a => res.add(a * ratio)); }); }
-        else { hzB.forEach(b => { let diff = hzToMidi(b) - hzToMidi(hzB[0]); hzA.forEach(a => res.add(midiToHz(hzToMidi(a) + diff))); }); }
+
+        hzB.forEach(b => {
+            let diff = hzToMidi(b) - hzToMidi(hzB[0]);
+            hzA.forEach(a => res.add(midiToHz(hzToMidi(a) + diff)));
+        });
+
         return Array.from(res).sort((a, b) => a - b);
-    }, [tab2InputA, tab2InputB, tab2NonTemp]);
+    }, [tab2InputA, tab2InputB, isMicrotonalMode, activeTuning]);
 
     const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
     const tab3ParsedInput = parseAdvancedToHz(tab3Input).map(hzToMidi);
     const tab3ResultHz = useMemo(() => {
-        let arr = [...tab3ParsedInput];
+        let arr = [...tab3ParsedInput]; // Note: arr contém valores MIDI/Steps
         if (arr.length < 2) return arr.map(midiToHz);
-        let intervalInt = Math.round(Math.abs(arr[arr.length - 1] - arr[0]));
-        let R = intervalInt % 12 === 0 ? 1 : 12 / gcd(12, intervalInt % 12);
-        if (!Number.isFinite(R) || R > 24 || R <= 0) R = 12;
+
+        // Converte o intervalo total para Cents puros (para garantir que a acústica fecha o ciclo)
+        const hzStart = midiToHz(arr[0]);
+        const hzEnd = midiToHz(arr[arr.length - 1]);
+        const intervalCents = Math.round(Math.abs(1200 * Math.log2(hzEnd / hzStart)));
+
+        // Se o intervalo fechar em múltiplos de 1200c (uma oitava inteira), não repete.
+        // Caso contrário, calcula o Mínimo Múltiplo Comum para fechar a oitava.
+        let R = intervalCents % 1200 === 0 ? 1 : 1200 / gcd(1200, intervalCents % 1200);
+        if (!Number.isFinite(R) || R > 40 || R <= 0) R = 12; // Limite de segurança
+
         let total = [...arr], cur = [...arr];
         for (let i = 1; i < R; i++) {
             let dist = total[total.length - 1] - cur[0];
             total = total.concat(cur.map(n => n + dist).slice(1));
         }
         return total.map(midiToHz);
-    }, [tab3ParsedInput]);
+    }, [tab3ParsedInput, isMicrotonalMode, activeTuning]);
 
     const tab4ResultHz = useMemo(() => {
         let hzArr = parseAdvancedToHz(tab4Input);
@@ -532,26 +552,29 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             if (res.size > tab6Limit * 3) break;
         }
         return Array.from(res).sort((a, b) => a - b).slice(0, tab6Limit);
-    }, [tab6Input, tab6Limit, tab6Order]);
+    }, [tab6Input, tab6Limit, tab6Order, isMicrotonalMode, activeTuning]);
 
     const tab7ResultHz = useMemo(() => {
         let C_arr = parseAdvancedToHz(tab7Carrier); if (!C_arr.length) C_arr = [440];
         let M = parseAdvancedToHz(tab7Modulator)[0] || 100, res = new Set();
         C_arr.forEach(C => { res.add(C); for (let i = 1; i <= tab7K; i++) { res.add(C + i * M); res.add(Math.abs(C - i * M)); } });
         return Array.from(res).sort((a, b) => a - b);
-    }, [tab7Carrier, tab7Modulator, tab7K]);
+    }, [tab7Carrier, tab7Modulator, tab7K, isMicrotonalMode, activeTuning]);
 
     const tab8ResultHz = useMemo(() => {
         let hzArr = parseAdvancedToHz(tab8Input), res = new Set();
         hzArr.forEach(f => { for (let i = 1; i <= tab8Harmonics; i++) res.add(f * i); for (let i = 1; i <= tab8Sub; i++) res.add(f / i); });
         return Array.from(res).sort((a, b) => a - b);
-    }, [tab8Input, tab8Harmonics, tab8Sub]);
+    }, [tab8Input, tab8Harmonics, tab8Sub, isMicrotonalMode, activeTuning]);
 
-    // ABA 9: Calculadora Costère
+    // ABA 9: Calculadora Costère Dinâmica
     const tab9Arr = useMemo(() => parseAdvancedToHz(tab9Input).map(hzToMidi), [tab9Input]);
     const tab9Analysis = useMemo(() => {
         if (tab9Arr.length === 0) return null;
-        const edo = (isMicrotonalMode && activeTuning.type === 'edo') ? activeTuning.divisions : 12;
+        // Descobre o tamanho do "universo" atual (EDO ou tamanho da escala JI Scala)
+        const edo = isMicrotonalMode
+            ? (activeTuning.type === 'edo' ? activeTuning.divisions : (activeTuning.data?.numNotes || 12))
+            : 12;
         return {
             densities: calculateCardinalDensity(tab9Arr, edo),
             vector: getIntervalVector(tab9Arr, edo)
@@ -559,61 +582,64 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     }, [tab9Arr, isMicrotonalMode, activeTuning]);
     const tab9ResultHz = useMemo(() => tab9Arr.map(midiToHz), [tab9Arr]);
 
-    // ABA 10: Interpolações (Motor Robusto Local adaptado para Xenharmonia)
+    // ABA 10: Interpolações (Motor Robusto com Glissandos Microtonais)
     const tab10Frames = useMemo(() => {
-        let arrA = parseAdvancedToHz(tab10InputA).map(hzToMidi);
-        let arrB = parseAdvancedToHz(tab10InputB).map(hzToMidi);
-        if (!arrA.length) arrA = [60];
-        if (!arrB.length) arrB = [60];
+        let hzA = parseAdvancedToHz(tab10InputA);
+        let hzB = parseAdvancedToHz(tab10InputB);
+        if (!hzA.length) hzA = [261.625];
+        if (!hzB.length) hzB = [261.625];
 
         const steps = tab10StepsCount;
         const frames = [];
         const isMelody = tab10Mode === 'melody';
-        const edo = (isMicrotonalMode && activeTuning.type === 'edo') ? activeTuning.divisions : 12;
 
-        const maxLen = Math.max(arrA.length, arrB.length);
-        const a = [...arrA, ...Array(maxLen - arrA.length).fill(arrA[arrA.length - 1] || 60)];
-        const b = [...arrB, ...Array(maxLen - arrB.length).fill(arrB[arrB.length - 1] || 60)];
+        const edo = isMicrotonalMode ? (activeTuning.type === 'edo' ? activeTuning.divisions : (activeTuning.data?.numNotes || 12)) : 12;
+
+        const maxLen = Math.max(hzA.length, hzB.length);
+        const aHz = [...hzA, ...Array(maxLen - hzA.length).fill(hzA[hzA.length - 1])];
+        const bHz = [...hzB, ...Array(maxLen - hzB.length).fill(hzB[hzB.length - 1])];
 
         if (tab10Algo === 'log') {
             for (let s = 0; s <= steps; s++) {
                 const t = s / steps;
-                let frame = a.map((nA, i) => Math.round(nA + (b[i] - nA) * t));
-                frames.push(isMelody ? frame : [...new Set(frame)]);
+                let frameHz = aHz.map((fA, i) => {
+                    const fB = bHz[i];
+                    return fA * Math.pow(fB / fA, t);
+                });
+                frames.push(isMelody ? applySnap(frameHz) : applySnap([...new Set(frameHz)]));
             }
         } else {
-            // Costère com Divisões Dinâmicas (EDO)
-            const pcsB = b.map(n => ((Math.round(n) % edo) + edo) % edo);
-            const densities = new Array(edo).fill(0);
+            const aSteps = aHz.map(hzToMidi).map(Math.round);
+            const bSteps = bHz.map(hzToMidi).map(Math.round);
 
-            // O passo que representa a 5ª justa (aprox 702 cents)
+            const pcsB = bSteps.map(n => ((n % edo) + edo) % edo);
+            const densities = new Array(edo).fill(0);
             const fifthStep = Math.round((702 / 1200) * edo);
 
             for (let i = 0; i < edo; i++) {
                 let score = 0;
-                [
-                    i,
-                    (i + fifthStep) % edo,
-                    (i - fifthStep + edo) % edo,
-                    (i + 1) % edo,
-                    (i - 1 + edo) % edo
-                ].forEach(att => {
+                [i, (i + fifthStep) % edo, (i - fifthStep + edo) % edo, (i + 1) % edo, (i - 1 + edo) % edo].forEach(att => {
                     if (pcsB.includes(att)) score++;
                 });
                 densities[i] = score;
             }
 
-            let curr = [...a];
-            frames.push(isMelody ? [...curr] : [...new Set(curr)]);
+            let currSteps = [...aSteps];
+            const pushFrame = (stps) => {
+                const hzArr = stps.map(midiToHz);
+                frames.push(isMelody ? applySnap(hzArr) : applySnap([...new Set(hzArr)]));
+            };
+
+            pushFrame(currSteps);
 
             for (let s = 1; s <= steps; s++) {
                 const t = s / steps;
-                let next = curr.map((note, i) => {
-                    if (note === b[i]) return note;
-                    const geomTarget = Math.round(a[i] + (b[i] - a[i]) * t);
-                    const pc = ((Math.round(note) % edo) + edo) % edo;
+                let nextSteps = currSteps.map((note, i) => {
+                    if (note === bSteps[i]) return note;
+                    const geomTarget = Math.round(aSteps[i] + (bSteps[i] - aSteps[i]) * t);
+                    const pc = ((note % edo) + edo) % edo;
 
-                    if (pcsB.includes(pc) && Math.abs(note - b[i]) < edo) return note + Math.sign(b[i] - note);
+                    if (pcsB.includes(pc) && Math.abs(note - bSteps[i]) < edo) return note + Math.sign(bSteps[i] - note);
 
                     const upPC = (pc + 1) % edo, downPC = (pc - 1 + edo) % edo;
                     const dUp = densities[upPC], dDown = densities[downPC];
@@ -625,17 +651,17 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     if (dDown > dUp) return note - 1;
                     return note + bias;
                 });
-                curr = next;
-                if (s === steps) curr = [...b];
-                frames.push(isMelody ? [...curr] : [...new Set(curr)]);
+                currSteps = nextSteps;
+                if (s === steps) currSteps = [...bSteps];
+                pushFrame(currSteps);
             }
         }
         return frames;
-    }, [tab10InputA, tab10InputB, tab10Mode, tab10Algo, tab10StepsCount, isMicrotonalMode, activeTuning]);
+    }, [tab10InputA, tab10InputB, tab10Mode, tab10Algo, tab10StepsCount, isMicrotonalMode, activeTuning, globalSnap]);
 
     const tab10ResultHz = useMemo(() => {
         const step = Math.min(tab10Step, tab10Frames.length - 1);
-        return tab10Frames[step] ? tab10Frames[step].map(midiToHz) : [];
+        return tab10Frames[step] || []; // Já retorna Hertz puros!
     }, [tab10Step, tab10Frames]);
 
     const arrToStr = arr => arr.map(hzToMidi).map(n => n.toFixed(2).replace('.00', '')).join(', ');
@@ -794,15 +820,19 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         }
     }, [tab9ResultHz, tab10ResultHz, activeTool, points]);
     // Sincroniza os Eixos da Rede 3D ao mudar de modo (Steps <-> Cents)
+    // Sincroniza os Eixos da Rede 3D ao mudar de modo (Steps <-> Cents)
+    const isFirstMount = useRef(true);
     useEffect(() => {
+        if (isFirstMount.current) { isFirstMount.current = false; return; } // Ignora na primeira vez que abre o site
+
         if (isMicrotonalMode) {
-            setIntX(x => x * 100);
-            setIntY(y => y * 100);
-            setIntZ(z => z * 100);
+            setIntX(x => x < 50 ? x * 100 : x);
+            setIntY(y => y < 50 ? y * 100 : y);
+            setIntZ(z => z < 50 ? z * 100 : z);
         } else {
-            setIntX(x => Math.round(x / 100));
-            setIntY(y => Math.round(y / 100));
-            setIntZ(z => Math.round(z / 100));
+            setIntX(x => x >= 50 ? Math.round(x / 100) : x);
+            setIntY(y => y >= 50 ? Math.round(y / 100) : y);
+            setIntZ(z => z >= 50 ? Math.round(z / 100) : z);
         }
     }, [isMicrotonalMode]);
     // ATALHO DE TECLADO: Alt + Setas para mover a última nota inserida
@@ -989,11 +1019,13 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                         <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
                             <PullButtons onPull={setTab2InputA} />
                             <label className="text-xs text-gray-400">A (Multiplicando):</label>
-                            <textarea value={tab2InputA} onChange={e => setTab2InputA(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[80px]" placeholder="Ex: 60, C+4" />
-                            <label className="text-xs text-gray-400">B (Multiplicador):</label>
-                            <textarea value={tab2InputB} onChange={e => setTab2InputB(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[80px]" />
-                            <label className="flex items-center text-[10px] text-orange-300"><input type="checkbox" className="mr-2" checked={tab2NonTemp} onChange={e => setTab2NonTemp(e.target.checked)} /> Valores Não Temperados</label>
-                            <button onClick={() => { setTab2InputA(""); setTab2InputB(""); }} className="bg-red-900 text-[10px] w-full py-1.5 rounded mt-2">Limpar</button>
+                            <textarea value={tab2InputA} onChange={e => setTab2InputA(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[60px]" placeholder="Ex: 60, 64, 67" />
+
+                            <label className="text-xs text-gray-400 mt-2">B (Multiplicador):</label>
+                            <textarea value={tab2InputB} onChange={e => setTab2InputB(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[60px]" placeholder="Ex: 0, 4, 7" />
+
+                            <button onClick={() => { setTab2InputA(""); setTab2InputB(""); }} className="bg-red-900 text-[10px] w-full py-1.5 rounded mt-2">Limpar Tudo</button>
+
                             <UniversalOutput hzArray={tab2ResultHz} title="Bloco Resultante" isSimultaneous={true} showMelody={true} />
                         </div>
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
@@ -1004,7 +1036,8 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <button onClick={() => setTab2InputA("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado (A)</button>
                                 </div>
                             </div>
-                            {viewMode === 'roll' ? <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab2ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={tab2NonTemp} onKeyClick={m => handleStaffClick(m, setTab2InputA)} /> : <GrandStaffVisualizer notes={tab2ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={tab2NonTemp} onKeyClick={m => handleStaffClick(m, setTab2InputA)} />}                        </div>
+                            {viewMode === 'roll' ? <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab2ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={isMicrotonalMode} onKeyClick={m => handleStaffClick(m, setTab2InputA)} /> : <GrandStaffVisualizer notes={tab2ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={isMicrotonalMode} onKeyClick={m => handleStaffClick(m, setTab2InputA)} />}
+                        </div>
                     </div>
                 )}
 
@@ -1034,7 +1067,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <button onClick={() => setTab3Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] px-3 h-8 rounded transition ml-2">Limpar Teclado</button>
                                 </div>
                             </div>
-                            {viewMode === 'roll' ? <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab3ResultHz.map(hzToStandardMidi)} isSequence={true} onKeyClick={m => handleStaffClick(m, setTab3Input)} onNoteDrag={(idx, m) => { let a = [...tab3ParsedInput]; if (idx < a.length) { a[idx] = m; setTab3Input(a.join(', ')); } }} originalEntityLength={tab3ParsedInput.length} onNoteDelete={(idx) => { let a = [...tab3ParsedInput]; if (idx < a.length) { a.splice(idx, 1); setTab3Input(a.join(', ')); } }} /> : <GrandStaffVisualizer notes={tab3ResultHz.map(hzToStandardMidi)} isSequence={true} onKeyClick={m => handleStaffClick(m, setTab3Input)} />}
+                            {viewMode === 'roll' ? <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab3ResultHz.map(hzToStandardMidi)} isSequence={true} isMicrotonal={isMicrotonalMode} onKeyClick={m => handleStaffClick(m, setTab3Input)} onNoteDrag={(idx, m) => { let a = [...tab3ParsedInput]; if (idx < a.length) { a[idx] = m; setTab3Input(a.join(', ')); } }} originalEntityLength={tab3ParsedInput.length} onNoteDelete={(idx) => { let a = [...tab3ParsedInput]; if (idx < a.length) { a.splice(idx, 1); setTab3Input(a.join(', ')); } }} /> : <GrandStaffVisualizer notes={tab3ResultHz.map(hzToStandardMidi)} isSequence={true} isMicrotonal={isMicrotonalMode} onKeyClick={m => handleStaffClick(m, setTab3Input)} />}
                         </div>
                     </div>
                 )}
@@ -1051,15 +1084,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                 <div><label className="text-[10px] text-gray-300">Min: {targetMinHz} Hz</label><input type="range" min="20" max="2000" value={targetMinHz} onChange={e => setTargetMinHz(Number(e.target.value))} className="w-full accent-blue-500" /></div>
                                 <div><label className="text-[10px] text-gray-300">Max: {targetMaxHz} Hz</label><input type="range" min="20" max="10000" value={targetMaxHz} onChange={e => setTargetMaxHz(Number(e.target.value))} className="w-full accent-blue-500" /></div>
                             </div>
-                            <button
-                                onClick={() => {
-                                    const snapped = tab4ResultHz.map(hz => midiToHz(Math.round(hzToMidi(hz))));
-                                    setTab4Input(snapped.map(hz => hz.toFixed(2) + "Hz").join(", "));
-                                }}
-                                className="w-full bg-indigo-700 hover:bg-indigo-600 text-white text-[10px] py-1.5 rounded shadow transition mb-2"
-                            >
-                                Quantizar e Substituir (Snap to Grid)
-                            </button>
+
                             <UniversalOutput hzArray={tab4ResultHz} title="Projeção" isSimultaneous={true} showMelody={true} />
                         </div>
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
@@ -1181,18 +1206,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                             <textarea value={tab8Input} onChange={e => setTab8Input(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[80px]" placeholder="Fundamentais..." />
                             <button onClick={() => setTab8Input("")} className="bg-red-900 text-[10px] w-full py-1.5 rounded">Limpar Pauta</button>
                             <div className="flex justify-around py-2 border-y border-gray-700 mt-2 mb-3">
-                                <Knob value={tab8Harmonics} min={1} max={16} step={1} onChange={setTab8Harmonics} label="Harmônicos" />
-                                <Knob value={tab8Sub} min={1} max={8} step={1} onChange={setTab8Sub} label="Sub-Harm" />
+                                <Knob value={tab8Harmonics} min={1} max={100} step={1} onChange={setTab8Harmonics} label="Harmônicos" />
+                                <Knob value={tab8Sub} min={1} max={32} step={1} onChange={setTab8Sub} label="Sub-Harm" />
                             </div>
-                            <button
-                                onClick={() => {
-                                    const snapped = tab8ResultHz.map(hz => midiToHz(Math.round(hzToMidi(hz))));
-                                    setTab8Input(snapped.map(hz => hz.toFixed(2) + "Hz").join(", "));
-                                }}
-                                className="w-full bg-indigo-700 hover:bg-indigo-600 text-white text-[10px] py-1.5 rounded shadow transition mb-2"
-                            >
-                                Quantizar Espectro (Snap to Grid)
-                            </button>
+
                             <UniversalOutput hzArray={tab8ResultHz} title="Espectro Aditivo" isSimultaneous={true} showMelody={true} />
                         </div>
                         <div className="flex-1 min-w-0 p-4 bg-gray-950 flex flex-col">
@@ -1259,8 +1276,8 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                 </div>
                                 <div className="flex-1 shadow-2xl rounded overflow-hidden border border-gray-700 bg-gray-900 bg-opacity-90 backdrop-blur-sm">
                                     {viewMode === 'roll' ?
-                                        <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab9ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={false} onKeyClick={m => handleStaffClick(m, setTab9Input)} /> :
-                                        <GrandStaffVisualizer notes={tab9ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={false} onKeyClick={m => handleStaffClick(m, setTab9Input)} />}
+                                        <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab9ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={isMicrotonalMode} onKeyClick={m => handleStaffClick(m, setTab9Input)} /> :
+                                        <GrandStaffVisualizer notes={tab9ResultHz.map(hzToStandardMidi)} isSequence={false} isMicrotonal={isMicrotonalMode} onKeyClick={m => handleStaffClick(m, setTab9Input)} />}
                                 </div>
                             </div>
                         </div>
@@ -1325,8 +1342,8 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
                                 <div className="flex-1 shadow-2xl rounded overflow-hidden border border-gray-700 bg-gray-900 bg-opacity-90 backdrop-blur-sm">
                                     {viewMode === 'roll' ?
-                                        <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab10ResultHz.map(hzToStandardMidi)} isSequence={tab10Mode === 'melody'} isMicrotonal={false} onKeyClick={m => handleStaffClick(m, setTab10InputA)} /> :
-                                        <GrandStaffVisualizer notes={tab10ResultHz.map(hzToStandardMidi)} isSequence={tab10Mode === 'melody'} isMicrotonal={false} onKeyClick={m => handleStaffClick(m, setTab10InputA)} />
+                                        <BachRollVisualizer getIsBlackKey={getIsBlackKey} notes={tab10ResultHz.map(hzToStandardMidi)} isSequence={tab10Mode === 'melody'} isMicrotonal={isMicrotonalMode} onKeyClick={m => handleStaffClick(m, setTab10InputA)} /> :
+                                        <GrandStaffVisualizer notes={tab10ResultHz.map(hzToStandardMidi)} isSequence={tab10Mode === 'melody'} isMicrotonal={isMicrotonalMode} onKeyClick={m => handleStaffClick(m, setTab10InputA)} />
                                     }
                                 </div>
                             </div>

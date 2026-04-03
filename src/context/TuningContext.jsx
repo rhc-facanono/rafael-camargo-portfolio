@@ -1,25 +1,19 @@
+// src/context/TuningContext.jsx
 import React, { createContext, useState, useContext } from 'react';
 
 const TuningContext = createContext();
 
 export function TuningProvider({ children }) {
     const [isMicrotonalMode, setIsMicrotonalMode] = useState(false);
-
-    // activeTuning agora pode ser 'edo', 'scala' ou 'custom' (para JI e outras)
     const [activeTuning, setActiveTuning] = useState({ type: 'edo', divisions: 19, data: null });
-
-    // ----------------------------------------------------
-    // NOVAS VARIÁVEIS DO SCALE WORKSHOP
-    // ----------------------------------------------------
-
-    // Âncoras de Frequência (Padrão: MIDI 60 = 261.625565 Hz)
     const [baseMidi, setBaseMidi] = useState(60);
     const [baseHz, setBaseHz] = useState(261.625565);
-
-    // Configuração das Cores das Teclas no Piano Roll / Teclado
-    const [keyColorMode, setKeyColorMode] = useState('auto'); // 'auto', '12-tet', 'custom'
-    // Array padrão de cores caso o usuário queira pintar manualmente (W = White, B = Black)
+    const [keyColorMode, setKeyColorMode] = useState('auto');
     const [customKeyPattern, setCustomKeyPattern] = useState(['W', 'B', 'W', 'B', 'W', 'W', 'B', 'W', 'B', 'W', 'B', 'W']);
+
+    // As duas variáveis vitais que faltavam para os botões funcionarem:
+    const [accidentalModifier, setAccidentalModifier] = useState(0);
+    const [globalSnap, setGlobalSnap] = useState(false);
 
     const toggleMicrotonalMode = () => {
         setIsMicrotonalMode(prev => !prev);
@@ -32,7 +26,9 @@ export function TuningProvider({ children }) {
             baseMidi, setBaseMidi,
             baseHz, setBaseHz,
             keyColorMode, setKeyColorMode,
-            customKeyPattern, setCustomKeyPattern
+            customKeyPattern, setCustomKeyPattern,
+            accidentalModifier, setAccidentalModifier,
+            globalSnap, setGlobalSnap
         }}>
             {children}
         </TuningContext.Provider>
