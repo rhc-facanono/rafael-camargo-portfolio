@@ -422,6 +422,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     const [baseNote, setBaseNote] = useState(48);
     const [intX, setIntX] = useState(7), [intY, setIntY] = useState(12), [intZ, setIntZ] = useState(4);
     const [selectedSet, setSelectedSet] = useState(new Set()), [showOnlyHighlight, setShowOnlyHighlight] = useState(false), [filterText, setFilterText] = useState("");
+    const [nodeLabelMode, setNodeLabelMode] = useState("note"); // NOVO: "note", "degree", ou "hz"
 
     const [tab2InputA, setTab2InputA] = useState(""), [tab2InputB, setTab2InputB] = useState("0, 4, 7"), [tab2NonTemp, setTab2NonTemp] = useState(false);
     const [tab3Input, setTab3Input] = useState("");
@@ -454,7 +455,6 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     // MOTORES (MEMOIZED)
     const points = useMemo(() => {
         const arr = [];
-        // Se estivermos no modo microtonal, convertemos os cents para a escala decimal do MIDI (dividindo por 100)
         const stepX = isMicrotonalMode ? intX / 100 : intX;
         const stepY = isMicrotonalMode ? intY / 100 : intY;
         const stepZ = isMicrotonalMode ? intZ / 100 : intZ;
@@ -463,8 +463,16 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             for (let y = -2; y <= 2; y++) {
                 for (let z = -2; z <= 2; z++) {
                     const midiVal = baseNote + (x * stepX) + (y * stepY) + (z * stepZ);
-                    // Se for microtonal, mostra o valor exato em vez do nome da nota arredondada
-                    const noteLabel = isMicrotonalMode ? midiVal.toFixed(2) : midiToNote(midiVal);
+
+                    // Formata a label baseada na escolha do Dropdown
+                    let noteLabel = "";
+                    if (nodeLabelMode === "degree") {
+                        noteLabel = isMicrotonalMode ? midiVal.toFixed(2) : Math.round(midiVal).toString();
+                    } else if (nodeLabelMode === "hz") {
+                        noteLabel = `${midiToHz(midiVal).toFixed(1)} Hz`;
+                    } else {
+                        noteLabel = midiToNote(midiVal); // Nota + Cents
+                    }
 
                     arr.push({
                         coord: [x, y, z],
@@ -476,7 +484,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             }
         }
         return arr;
-    }, [baseNote, intX, intY, intZ, isMicrotonalMode]);
+    }, [baseNote, intX, intY, intZ, isMicrotonalMode, activeTuning, baseHz, nodeLabelMode]);
 
     const tab1Hz = useMemo(() => points.filter(pt => selectedSet.has(pt.coord.join(','))).map(pt => midiToHz(pt.midi)).sort((a, b) => a - b), [points, selectedSet]);
 
@@ -1002,6 +1010,19 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     </div>
                                 </div>
                                 <div className="pt-3 border-t border-gray-600">
+
+                                    {/* MENU DE VISUALIZAÇÃO DOS NÓS 3D */}
+                                    <span className="text-xs text-gray-400 block mb-1">Rótulos das Esferas:</span>
+                                    <select
+                                        className="w-full bg-gray-800 text-[10px] p-1.5 rounded border border-gray-600 mb-3 text-white"
+                                        value={nodeLabelMode}
+                                        onChange={e => setNodeLabelMode(e.target.value)}
+                                    >
+                                        <option value="note">Nota + Cents</option>
+                                        <option value="degree">Grau / Steps</option>
+                                        <option value="hz">Frequência Exata (Hz)</option>
+                                    </select>
+
                                     <span className="text-xs text-gray-400 block mb-2">Filtrar (ex: 0,1,-1 a 3,1,-1):</span>
                                     <div className="flex space-x-2 mb-3">
                                         <input type="text" className="flex-1 bg-gray-800 text-xs p-1.5 rounded border border-gray-600" value={filterText} onChange={e => setFilterText(e.target.value)} />
