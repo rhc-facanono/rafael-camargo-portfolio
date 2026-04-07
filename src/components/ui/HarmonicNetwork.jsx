@@ -349,6 +349,42 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         if (!globalSnap) return hzArray;
         return hzArray.map(hz => midiToHz(Math.round(hzToMidi(hz))));
     }
+
+    // === TRADUTORES UNIVERSAIS DE EIXOS (Mantém a acústica na mudança de afinação) ===
+    function getCentsForStep(step, tuning, isMicro) {
+        if (!isMicro) return step * 100;
+        if (tuning.type === 'edo') return step * (1200 / tuning.divisions);
+        if (tuning.type === 'scala' && tuning.data && tuning.data.scale.length > 0) {
+            const scale = tuning.data.scale;
+            const scaleLen = scale.length;
+            const period = scale[scaleLen - 1].cents || 1200;
+            const octaves = Math.floor(step / scaleLen);
+            const remainder = ((step % scaleLen) + scaleLen) % scaleLen;
+            const centsWithin = remainder === 0 ? 0 : scale[remainder - 1].cents;
+            return (octaves * period) + centsWithin;
+        }
+        return step * 100;
+    }
+
+    function getClosestStepForCents(cents, tuning, isMicro) {
+        if (!isMicro) return Math.round(cents / 100);
+        if (tuning.type === 'edo') return Math.round(cents / (1200 / tuning.divisions));
+        if (tuning.type === 'scala' && tuning.data && tuning.data.scale.length > 0) {
+            const scale = tuning.data.scale;
+            const period = scale[scale.length - 1].cents || 1200;
+            const octaves = Math.floor(cents / period);
+            const remainder = cents - (octaves * period);
+
+            let closestIdx = 0, minDiff = Math.abs(remainder);
+            scale.forEach((s, i) => {
+                const diff = Math.abs(remainder - s.cents);
+                if (diff < minDiff) { minDiff = diff; closestIdx = i + 1; }
+            });
+            return octaves * scale.length + closestIdx;
+        }
+        return Math.round(cents / 100);
+    }
+
     // Retorna a nota mais próxima com o desvio em Cents visível para TODOS os modos (Ex: E4 -50c)
     function midiToNote(m) {
         if (m === undefined || m === null) return "";
@@ -419,10 +455,33 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     }
     globalHzToMidi = hzToMidi;
     globalFormatAllOutput = formatAllOutput;
-    const [baseNote, setBaseNote] = useState(48);
+    // baseNote removido, agora usa baseMidi do TuningContext
     const [intX, setIntX] = useState(7), [intY, setIntY] = useState(12), [intZ, setIntZ] = useState(4);
     const [selectedSet, setSelectedSet] = useState(new Set()), [showOnlyHighlight, setShowOnlyHighlight] = useState(false), [filterText, setFilterText] = useState("");
     const [nodeLabelMode, setNodeLabelMode] = useState("note"); // NOVO: "note", "degree", ou "hz"
+
+    // CÉREBRO TRADUTOR: Protege as proporções acústicas ao mudar de afinação
+    const prevTuningParams = useRef({ isMicro: isMicrotonalMode, tuning: activeTuning });
+    const isFirstTuningMount = useRef(true);
+    useEffect(() => {
+        if (isFirstTuningMount.current) { isFirstTuningMount.current = false; return; }
+
+        const prev = prevTuningParams.current;
+        if (prev.isMicro !== isMicrotonalMode || prev.tuning !== activeTuning) {
+            const oldTuning = prev.isMicro ? prev.tuning : { type: 'edo', divisions: 12 };
+            const newTuning = isMicrotonalMode ? activeTuning : { type: 'edo', divisions: 12 };
+
+            const translateAxis = (step) => {
+                const centsOriginal = getCentsForStep(step, oldTuning, prev.isMicro);
+                return getClosestStepForCents(centsOriginal, newTuning, isMicrotonalMode);
+            };
+
+            setIntX(x => translateAxis(x));
+            setIntY(y => translateAxis(y));
+            setIntZ(z => translateAxis(z));
+        }
+        prevTuningParams.current = { isMicro: isMicrotonalMode, tuning: activeTuning };
+    }, [isMicrotonalMode, activeTuning]);
 
     const [tab2InputA, setTab2InputA] = useState(""), [tab2InputB, setTab2InputB] = useState("0, 4, 7"), [tab2NonTemp, setTab2NonTemp] = useState(false);
     const [tab3Input, setTab3Input] = useState("");
@@ -455,15 +514,12 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     // MOTORES (MEMOIZED)
     const points = useMemo(() => {
         const arr = [];
-        const stepX = isMicrotonalMode ? intX / 100 : intX;
-        const stepY = isMicrotonalMode ? intY / 100 : intY;
-        const stepZ = isMicrotonalMode ? intZ / 100 : intZ;
 
         for (let x = -7; x <= 7; x++) {
             for (let y = -2; y <= 2; y++) {
                 for (let z = -2; z <= 2; z++) {
-                    const midiVal = baseNote + (x * stepX) + (y * stepY) + (z * stepZ);
-
+                    // Magia Pura: Eixos baseados sempre em steps (degraus) e ancorados ao baseMidi global
+                    const midiVal = baseMidi + (x * intX) + (y * intY) + (z * intZ);
                     // Formata a label baseada na escolha do Dropdown
                     let noteLabel = "";
                     if (nodeLabelMode === "degree") {
@@ -484,7 +540,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             }
         }
         return arr;
-    }, [baseNote, intX, intY, intZ, isMicrotonalMode, activeTuning, baseHz, nodeLabelMode]);
+    }, [baseMidi, intX, intY, intZ, isMicrotonalMode, activeTuning, baseHz, nodeLabelMode]);
 
     const tab1Hz = useMemo(() => points.filter(pt => selectedSet.has(pt.coord.join(','))).map(pt => midiToHz(pt.midi)).sort((a, b) => a - b), [points, selectedSet]);
 
@@ -827,22 +883,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             setSelectedSet(newSet);
         }
     }, [tab9ResultHz, tab10ResultHz, activeTool, points]);
-    // Sincroniza os Eixos da Rede 3D ao mudar de modo (Steps <-> Cents)
-    // Sincroniza os Eixos da Rede 3D ao mudar de modo (Steps <-> Cents)
-    const isFirstMount = useRef(true);
-    useEffect(() => {
-        if (isFirstMount.current) { isFirstMount.current = false; return; } // Ignora na primeira vez que abre o site
 
-        if (isMicrotonalMode) {
-            setIntX(x => x < 50 ? x * 100 : x);
-            setIntY(y => y < 50 ? y * 100 : y);
-            setIntZ(z => z < 50 ? z * 100 : z);
-        } else {
-            setIntX(x => x >= 50 ? Math.round(x / 100) : x);
-            setIntY(y => y >= 50 ? Math.round(y / 100) : y);
-            setIntZ(z => z >= 50 ? Math.round(z / 100) : z);
-        }
-    }, [isMicrotonalMode]);
     // ATALHO DE TECLADO: Alt + Setas para mover a última nota inserida
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -989,23 +1030,30 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                         <div className="absolute top-4 left-4 bg-gray-900 bg-opacity-95 p-4 rounded-lg z-10 w-[260px] shadow-xl border border-gray-700 flex flex-col pointer-events-auto" style={{ maxHeight: '85vh' }}>
                             <div className="overflow-y-auto custom-scrollbar pr-2 flex-1 flex flex-col space-y-4">
                                 <div className="space-y-3">
-                                    <label className="flex justify-between items-center text-xs">Central (0,0,0):
-                                        <select className="bg-gray-800 p-1 rounded border border-gray-600" value={baseNote} onChange={e => setBaseNote(Number(e.target.value))}>
-                                            {noteNames.map((n, i) => <option key={i} value={48 + i}>{n}3</option>)}
-                                        </select>
+                                    <label className="flex justify-between items-center text-xs">Âncora Global (0,0,0):
+                                        <input
+                                            type="number"
+                                            className="bg-gray-800 p-1 rounded border border-gray-600 text-center w-16 text-[#00ffcc] font-bold"
+                                            value={baseMidi}
+                                            onChange={e => {
+                                                const novoMidi = Number(e.target.value);
+                                                setBaseMidi(novoMidi);
+                                                setBaseHz(Number((440 * Math.pow(2, (novoMidi - 69) / 12)).toFixed(6)));
+                                            }}
+                                        />
                                     </label>
                                     <div className="grid grid-cols-3 gap-2">
                                         <label className="flex flex-col text-[10px] text-gray-400">
-                                            {isMicrotonalMode ? 'X (Cents):' : 'X (5as):'}
-                                            <input className="mt-1 bg-gray-800 p-1 text-center rounded" type="number" step="any" value={intX} onChange={e => setIntX(parseFloat(e.target.value) || 0)} />
+                                            Eixo X (Graus):
+                                            <input className="mt-1 bg-gray-800 p-1 text-center rounded text-white" type="number" step="1" value={intX} onChange={e => setIntX(parseInt(e.target.value) || 0)} />
                                         </label>
                                         <label className="flex flex-col text-[10px] text-gray-400">
-                                            {isMicrotonalMode ? 'Y (Cents):' : 'Y (8as):'}
-                                            <input className="mt-1 bg-gray-800 p-1 text-center rounded" type="number" step="any" value={intY} onChange={e => setIntY(parseFloat(e.target.value) || 0)} />
+                                            Eixo Y (Graus):
+                                            <input className="mt-1 bg-gray-800 p-1 text-center rounded text-white" type="number" step="1" value={intY} onChange={e => setIntY(parseInt(e.target.value) || 0)} />
                                         </label>
                                         <label className="flex flex-col text-[10px] text-gray-400">
-                                            {isMicrotonalMode ? 'Z (Cents):' : 'Z (3as):'}
-                                            <input className="mt-1 bg-gray-800 p-1 text-center rounded" type="number" step="any" value={intZ} onChange={e => setIntZ(parseFloat(e.target.value) || 0)} />
+                                            Eixo Z (Graus):
+                                            <input className="mt-1 bg-gray-800 p-1 text-center rounded text-white" type="number" step="1" value={intZ} onChange={e => setIntZ(parseInt(e.target.value) || 0)} />
                                         </label>
                                     </div>
                                 </div>
@@ -1031,7 +1079,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <label className="flex items-center text-xs cursor-pointer mb-3"><input type="checkbox" className="mr-2" checked={showOnlyHighlight} onChange={e => setShowOnlyHighlight(e.target.checked)} /> Esconder inativas</label>
                                     <div className="flex space-x-2">
                                         <button onClick={() => panControlsRef.current?.resetCamera()} className="flex-1 bg-blue-900 text-[10px] py-1.5 rounded">Cent. Câm</button>
-                                        <button onClick={() => { setBaseNote(48); setIntX(7); setIntY(12); setIntZ(4); setSelectedSet(new Set()); }} className="flex-1 bg-red-900 text-[10px] py-1.5 rounded">Limpar</button>
+                                        <button onClick={() => { setBaseMidi(60); setIntX(7); setIntY(12); setIntZ(4); setSelectedSet(new Set()); }} className="flex-1 bg-red-900 text-[10px] py-1.5 rounded">Limpar</button>
                                     </div>
                                 </div>
                                 <UniversalOutput hzArray={tab1Hz} title="Entidade Gerada" isSimultaneous={true} showMelody={true} />
