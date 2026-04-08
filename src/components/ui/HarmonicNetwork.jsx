@@ -406,20 +406,17 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
     const hzToStandardMidi = (hz) => 69 + 12 * Math.log2(hz / 440);
 
-    // O "Snap-to-Freq" Inteligente (Agora respeita acidentes microtonais puros da Barra de Ferramentas!)
+    // O "Snap-to-Freq" Inteligente (Força qualquer acidente da pauta a encaixar na escala escolhida)
     const handleStaffClick = (clickedMidi12TET, setInputState) => {
         if (!isMicrotonalMode) {
             setInputState(prev => prev ? prev + ", " + clickedMidi12TET : String(clickedMidi12TET));
         } else {
             const targetHz = 440 * Math.pow(2, (clickedMidi12TET - 69) / 12);
-            let realHz = targetHz;
 
-            // Se a nota NÃO tiver casas decimais, significa que você clicou normalmente na pauta.
-            // Neste caso, fazemos o "Snap" para a nota mais próxima da afinação EDO atual.
-            if (Math.abs(clickedMidi12TET % 1) < 0.01) {
-                const nearestStep = Math.round(hzToMidi(targetHz));
-                realHz = midiToHz(nearestStep);
-            }
+            // Removemos a limitação! Agora, clique com #, b, ou quarto-de-tom, 
+            // o sistema acha a frequência 12-TET teórica e atrai como um íman para o degrau da escala ativa mais próximo!
+            const nearestStep = Math.round(hzToMidi(targetHz));
+            const realHz = midiToHz(nearestStep);
 
             const formattedHz = realHz.toFixed(2) + "Hz";
             setInputState(prev => prev ? prev + ", " + formattedHz : formattedHz);
@@ -924,12 +921,34 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                 let numVal = parseFloat(match[0]);
                 let suffix = lastPart.replace(match[0], ''); // Guarda "Hz", "c", etc.
 
-                // Sobe ou desce 1 unidade
-                const step = e.key === 'ArrowUp' ? 1 : -1;
-                let newVal = numVal + step;
+                const stepDir = e.key === 'ArrowUp' ? 1 : -1;
+                let newValStr = "";
 
-                // Formata o número final
-                let newValStr = Number.isInteger(newVal) ? newVal.toString() : newVal.toFixed(2);
+                if (isMicrotonalMode) {
+                    // 1. Converte o que está escrito em Hz puros
+                    let currentHz = numVal;
+                    if (suffix.toLowerCase().trim() === 'hz') currentHz = numVal;
+                    else if (suffix.toLowerCase().trim() === 'c') currentHz = midiToHz(numVal / 100);
+                    else currentHz = midiToHz(numVal); // Assume que é o número do Step
+
+                    // 2. Acha o degrau atual da escala
+                    let currentStep = Math.round(hzToMidi(currentHz));
+                    // 3. Anda um degrau inteiro na escala (19-EDO, JI, Bohlen-Pierce...)
+                    let nextStep = currentStep + stepDir;
+
+                    // 4. Formata de volta para a linguagem que o utilizador estava a usar
+                    if (suffix.toLowerCase().trim() === 'hz') {
+                        newValStr = midiToHz(nextStep).toFixed(2);
+                    } else if (suffix.toLowerCase().trim() === 'c') {
+                        newValStr = (nextStep * 100).toString();
+                    } else {
+                        newValStr = nextStep.toString();
+                    }
+                } else {
+                    // Modo 12-TET clássico: apenas sobe/desce 1 semitom
+                    let newVal = numVal + stepDir;
+                    newValStr = Number.isInteger(newVal) ? newVal.toString() : newVal.toFixed(2);
+                }
 
                 parts[parts.length - 1] = newValStr + suffix;
                 current.set(parts.join(', '));
@@ -1032,8 +1051,11 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                 {/* ABA 1: REDES */}
                 {activeTool === 1 && (
                     <>
-                        <div className="absolute top-4 left-4 bg-gray-900 bg-opacity-95 p-4 rounded-lg z-10 w-[260px] shadow-xl border border-gray-700 flex flex-col pointer-events-auto" style={{ maxHeight: '85vh' }}>
-                            <div className="overflow-y-auto custom-scrollbar pr-2 flex-1 flex flex-col space-y-4">
+                        {/* NOVO CONTAINER: Preso ao topo e ao fundo (bottom-4) para garantir que a barra de rolagem funcione! */}
+                        <div className="absolute top-4 bottom-4 left-4 bg-gray-900 bg-opacity-95 p-3 rounded-lg z-10 w-[280px] shadow-xl border border-gray-700 flex flex-col pointer-events-auto">
+
+                            {/* ÁREA COM SCROLL (Apenas os controlos rolam) */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
                                 <div className="space-y-3">
                                     <label className="flex justify-between items-center text-xs">Âncora Global (0,0,0):
                                         <input
@@ -1063,7 +1085,6 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     </div>
                                 </div>
                                 <div className="pt-3 border-t border-gray-600">
-
                                     {/* MENU DE VISUALIZAÇÃO DOS NÓS 3D */}
                                     <span className="text-xs text-gray-400 block mb-1">Rótulos das Esferas:</span>
                                     <select
@@ -1087,9 +1108,15 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                         <button onClick={() => { setBaseMidi(60); setIntX(7); setIntY(12); setIntZ(4); setSelectedSet(new Set()); }} className="flex-1 bg-red-900 text-[10px] py-1.5 rounded">Limpar</button>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* RESULTADO FIXO NO FUNDO (Não rola, fica sempre visível) */}
+                            <div className="flex-none pt-3 mt-2 border-t border-gray-700">
                                 <UniversalOutput hzArray={tab1Hz} title="Entidade Gerada" isSimultaneous={true} showMelody={true} />
                             </div>
                         </div>
+
+                        {/* O CANVAS 3D CONTINUA AQUI INTACTO... */}
                         <div className="w-full h-full absolute inset-0 z-0">
                             <Canvas camera={{ position: [0, 0, 2.2], fov: 60 }}>
                                 <ambientLight />
