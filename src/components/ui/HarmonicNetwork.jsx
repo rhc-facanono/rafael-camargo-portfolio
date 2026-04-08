@@ -511,6 +511,11 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
     const ignoreNextRef = useRef(false), panControlsRef = useRef();
 
+    // ABA 14 - NOTAÇÃO MICROTONAL
+    const [tab14Input, setTab14Input] = useState("");
+    const [notationSystem, setNotationSystem] = useState("auto"); // "auto", "he" (Helmholtz-Ellis), "sagittal"
+    const [sagittalLevel, setSagittalLevel] = useState("spartan"); // "spartan", "athenian"
+
     // MOTORES (MEMOIZED)
     const points = useMemo(() => {
         const arr = [];
@@ -1696,7 +1701,89 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                         </div>
                     </div>
                 )}
+                {/* ABA 14: EDITOR DE NOTAÇÃO MICROTONAL */}
+                {activeTool === 14 && (
+                    <div className="flex w-full h-full bg-gray-800">
+                        <div className="w-[320px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-4 overflow-y-auto custom-scrollbar">
+                            <PullButtons onPull={setTab14Input} />
 
+                            <div>
+                                <h3 className="text-yellow-400 font-bold text-[10px] uppercase mb-2 tracking-wider">Configuração da Partitura</h3>
+                                <label className="text-xs text-gray-400 mb-1 block">Sistema de Acidentes:</label>
+                                <select
+                                    value={notationSystem}
+                                    onChange={e => setNotationSystem(e.target.value)}
+                                    className="w-full bg-gray-800 text-[11px] p-2 rounded border border-gray-600 text-white mb-3"
+                                >
+                                    <option value="auto">Automático (Sugerido pela Escala)</option>
+                                    <option value="cents">Nota + Cents (Exato/Universal)</option>
+                                    <option value="he">Helmholtz-Ellis (Just Intonation)</option>
+                                    <option value="sagittal">Sagittal (JI & EDOs)</option>
+                                    <option value="quarter">Quartos de Tom (24-EDO)</option>
+                                    <option value="sixth">Sextos de Tom (36-EDO)</option>
+                                    <option value="eighth">Oitavos de Tom (48-EDO)</option>
+                                </select>
+
+                                {notationSystem === 'sagittal' && (
+                                    <div className="mb-3">
+                                        <label className="text-xs text-gray-400 mb-1 block">Nível Sagittal:</label>
+                                        <select
+                                            value={sagittalLevel}
+                                            onChange={e => setSagittalLevel(e.target.value)}
+                                            className="w-full bg-gray-800 text-[11px] p-2 rounded border border-gray-600 text-white"
+                                        >
+                                            <option value="spartan">Spartan (Básico - EDOs até 72)</option>
+                                            <option value="athenian">Athenian (Avançado)</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="text-xs text-gray-400 block mb-1 mt-2">Entidade para Notação:</label>
+                                <textarea
+                                    value={tab14Input}
+                                    onChange={e => setTab14Input(e.target.value)}
+                                    className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[80px]"
+                                    placeholder="Ex: 60, 64.5, 67 (Puxe das abas)"
+                                />
+                                <button onClick={() => setTab14Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] w-full py-1.5 rounded mt-2 transition">Limpar Notas</button>
+                            </div>
+
+                            <div className="mt-auto pt-4 border-t border-gray-700">
+                                <div className="text-[10px] text-gray-400 mb-1">Dica de Notação:</div>
+                                <div className="bg-gray-950 p-2 rounded border border-gray-700 text-gray-300 font-mono text-[9px] shadow-inner leading-relaxed">
+                                    {notationSystem === 'auto' && "O sistema escolherá HE para Just Intonation e Sagittal para divisões iguais complexas (EDOs)."}
+                                    {notationSystem === 'cents' && "Mantém o acidente 12-TET normal e adiciona o desvio exato em cents acima da nota. Perfeito para qualquer afinação."}
+                                    {notationSystem === 'he' && "HE (Sabat/Schweinitz) usa setas para o limite-5 (vírgula sintônica) e ganchos para o limite-7. Ideal para Just Intonation."}
+                                    {notationSystem === 'sagittal' && "Sagittal usa flechas específicas para medir comas puras ou divisões de EDO. O nível Spartan cobre o essencial."}
+                                    {notationSystem === 'quarter' && "Aproximação para 24-EDO. Usa meios-sustenidos (cruz com uma haste) e meios-bemóis (b invertido)."}
+                                    {notationSystem === 'sixth' && "Aproximação para 36-EDO. Utiliza setas direcionais nos acidentes clássicos para indicar +/- 33.3 cents."}
+                                    {notationSystem === 'eighth' && "Aproximação para 48-EDO. Combina acidentes de quarto-de-tom com setas de oitavo-de-tom (Stein-Zimmermann)."}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 min-w-0 p-6 bg-gray-950 flex flex-col justify-center items-center overflow-auto custom-scrollbar relative">
+                            {/* AQUI ENTRARÁ O NOVO MOTOR SVG DA PAUTA MICROTONAL */}
+                            <div className="w-full max-w-4xl bg-[#fdfdfd] h-64 rounded shadow-2xl border border-gray-300 flex items-center justify-center relative overflow-hidden">
+
+                                {/* Linhas do Pentagrama Falsas (Placeholder) */}
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20">
+                                    <div className="w-[90%] h-[1px] bg-black mb-2"></div>
+                                    <div className="w-[90%] h-[1px] bg-black mb-2"></div>
+                                    <div className="w-[90%] h-[1px] bg-black mb-2"></div>
+                                    <div className="w-[90%] h-[1px] bg-black mb-2"></div>
+                                    <div className="w-[90%] h-[1px] bg-black"></div>
+                                </div>
+
+                                <span className="text-gray-400 font-bold tracking-widest uppercase z-10 text-sm">
+                                    Motor de Renderização SMuFL em Construção...
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

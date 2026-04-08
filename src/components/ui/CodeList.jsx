@@ -160,6 +160,18 @@ const codeData = [
         comoUsar: {
             pt: "Ligue o seu teclado MIDI USB ou clique nas teclas do ecrã. O sintetizador interno reproduzirá a frequência microtonal exata processada de acordo com as regras ativas da Aba 11."
         }
+    },
+    {
+        id: "tool-notacao", type: "tool", toolIndex: 14,
+        label: "Notação Microtonal",
+        color: "#ff99ff", // Um rosa choque/magenta para destacar
+        icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></g>,
+        contexto: {
+            pt: "Sistemas de notação microtonal estendida. Helmholtz-Ellis (Sabat/Schweinitz) utiliza proporções de Just Intonation baseadas em comas (limites 5, 7, 11). O Sagittal é um sistema universal em rede focado tanto em razões puras quanto em divisões iguais (EDO)."
+        },
+        comoUsar: {
+            pt: "Insira as frequências ou graus na caixa de texto. Escolha o sistema de acidentes. O algoritmo deduzirá a altura diatônica (linha do pentagrama) e anexará o símbolo vetorial (SVG) correspondente ao desvio em cents."
+        }
     }
 ];
 
