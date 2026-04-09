@@ -71,32 +71,62 @@ const playAudio = (hzArray, isSimultaneous = false) => {
     });
 };
 
-function exportMIDI(notes, isSequence = true) {
-    if (!notes || notes.length === 0) return;
+// Exportador MIDI Xenharmônico (MPE / Multicanal com Pitch Bend)
+function exportMIDI(hzArray, isSequence = true) {
+    if (!hzArray || hzArray.length === 0) return;
     const header = [0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x01, 0xe0];
-    let trackEvents = [0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20];
-    notes.forEach((note, i) => {
-        let m = Math.max(0, Math.min(127, Math.round(note)));
-        if (isSequence) {
-            trackEvents.push(0x00, 0x90, m, 0x60);
-            trackEvents.push(0x83, 0x60, 0x80, m, 0x00);
-        } else {
-            trackEvents.push(0x00, 0x90, m, 0x60);
-        }
-    });
-    if (!isSequence) {
-        notes.forEach((note, i) => {
-            let m = Math.max(0, Math.min(127, Math.round(note)));
-            trackEvents.push(...(i === 0 ? [0x83, 0x60] : [0x00]), 0x80, m, 0x00);
+    let trackEvents = [0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20]; // Tempo 120 BPM
+
+    if (isSequence) {
+        // Para melodias, usamos o Canal 1 e atualizamos o Pitch Bend antes de cada nota
+        hzArray.forEach(hz => {
+            let mFloat = 69 + 12 * Math.log2(hz / 440);
+            let stdNote = Math.max(0, Math.min(127, Math.round(mFloat)));
+            let stdHz = 440 * Math.pow(2, (stdNote - 69) / 12);
+            let cents = 1200 * Math.log2(hz / stdHz);
+            let pb = Math.max(0, Math.min(16383, Math.round(8192 + (cents * 40.96))));
+
+            trackEvents.push(0x00, 0xE0, pb & 0x7F, (pb >> 7) & 0x7F); // Pitch Bend
+            trackEvents.push(0x00, 0x90, stdNote, 0x60);               // Note On
+            trackEvents.push(0x83, 0x60, 0x80, stdNote, 0x00);         // Note Off (Delta 480 ticks)
+        });
+    } else {
+        // Para acordes, espalhamos as notas por 15 Canais MIDI para os Pitch Bends não chocarem (MPE fake)
+        hzArray.forEach((hz, i) => {
+            let ch = i % 16;
+            if (ch === 9) ch = 10; // Pula o Canal 10 (Reservado para Bateria no General MIDI)
+
+            let mFloat = 69 + 12 * Math.log2(hz / 440);
+            let stdNote = Math.max(0, Math.min(127, Math.round(mFloat)));
+            let stdHz = 440 * Math.pow(2, (stdNote - 69) / 12);
+            let cents = 1200 * Math.log2(hz / stdHz);
+            let pb = Math.max(0, Math.min(16383, Math.round(8192 + (cents * 40.96))));
+
+            trackEvents.push(0x00, 0xE0 + ch, pb & 0x7F, (pb >> 7) & 0x7F); // Pitch Bend no canal específico
+            trackEvents.push(0x00, 0x90 + ch, stdNote, 0x60);               // Note On no mesmo canal
+        });
+
+        hzArray.forEach((hz, i) => {
+            let ch = i % 16;
+            if (ch === 9) ch = 10;
+            let mFloat = 69 + 12 * Math.log2(hz / 440);
+            let stdNote = Math.max(0, Math.min(127, Math.round(mFloat)));
+
+            if (i === 0) trackEvents.push(0x83, 0x60); // A 1ª nota a desligar espera 480 ticks (1 batida)
+            else trackEvents.push(0x00);               // As restantes desligam no mesmo instante (Delta 0)
+
+            trackEvents.push(0x80 + ch, stdNote, 0x00);
         });
     }
-    trackEvents.push(0x00, 0xff, 0x2f, 0x00);
+
+    trackEvents.push(0x00, 0xff, 0x2f, 0x00); // Fim da Track
     const trackLen = trackEvents.length;
     const trackHeader = [0x4d, 0x54, 0x72, 0x6b, (trackLen >> 24) & 0xff, (trackLen >> 16) & 0xff, (trackLen >> 8) & 0xff, trackLen & 0xff];
+
     const blob = new Blob([new Uint8Array([...header, ...trackHeader, ...trackEvents])], { type: "audio/midi" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `Export_${isSequence ? 'Melodia' : 'Acorde'}.mid`;
+    a.download = `Export_${isSequence ? 'Melodia' : 'Acorde'}_Xen.mid`;
     a.click();
 }
 
@@ -133,9 +163,9 @@ const Knob = ({ value, min, max, onChange, label, step = 1 }) => {
 let globalHzToMidi = (hz) => 0;
 let globalFormatAllOutput = (arr) => ({ midi: "-", midiCents: "-", hz: "-", notes: "-", quarters: "-" });
 
-const UniversalOutput = ({ hzArray, title = "Resultado", showAudio = true, showMelody = false }) => {
-    // Usa o ponteiro para formatar o resultado
-    const fmt = globalFormatAllOutput(hzArray);
+const UniversalOutput = ({ hzArray, title = "Resultado", showAudio = true, showMelody = false, converter, formatter }) => {
+    // Se não receber via props, tenta usar o ponteiro global (fallback)
+    const fmt = formatter ? formatter(hzArray) : globalFormatAllOutput(hzArray);
 
     return (
         <div className="bg-gray-950 p-2 rounded border border-gray-700 flex flex-col mt-auto shadow-inner w-full flex-shrink-0">
@@ -152,14 +182,13 @@ const UniversalOutput = ({ hzArray, title = "Resultado", showAudio = true, showM
             {showAudio && (
                 <div className="flex flex-col gap-1">
                     <div className="flex gap-1">
-                        <button onClick={() => playAudio(hzArray, true)} className="w-1/2 bg-green-800 hover:bg-green-700 text-[9px] py-1.5 rounded transition">🎵 Play Acorde</button>
-                        {/* Usa o ponteiro para a conversão de exportação */}
-                        <button onClick={() => exportMIDI(hzArray.map(globalHzToMidi), false)} className="w-1/2 bg-blue-900 hover:bg-blue-800 text-[9px] py-1.5 rounded transition">Exportar Acorde</button>
+                        <button onClick={() => playAudio(hzArray, true)} className="w-1/2 bg-green-800 hover:bg-green-700 text-[9px] py-1.5 rounded transition shadow">🎵 Play Acorde</button>
+                        <button onClick={() => exportMIDI(hzArray, false)} className="w-1/2 bg-blue-900 hover:bg-blue-800 text-[9px] py-1.5 rounded transition shadow">⬇ Exportar Acorde</button>
                     </div>
                     {showMelody && (
                         <div className="flex gap-1">
-                            <button onClick={() => playAudio(hzArray, false)} className="w-1/2 bg-green-700 hover:bg-green-600 text-[9px] py-1.5 rounded transition">🎵 Play Melodia</button>
-                            <button onClick={() => exportMIDI(hzArray.map(globalHzToMidi), true)} className="w-1/2 bg-blue-800 hover:bg-blue-700 text-[9px] py-1.5 rounded transition">Exportar Melodia</button>
+                            <button onClick={() => playAudio(hzArray, false)} className="w-1/2 bg-green-700 hover:bg-green-600 text-[9px] py-1.5 rounded transition shadow">🎵 Play Melodia</button>
+                            <button onClick={() => exportMIDI(hzArray, true)} className="w-1/2 bg-blue-800 hover:bg-blue-700 text-[9px] py-1.5 rounded transition shadow">⬇ Exportar Melodia</button>
                         </div>
                     )}
                 </div>
@@ -406,17 +435,20 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
     const hzToStandardMidi = (hz) => 69 + 12 * Math.log2(hz / 440);
 
-    // O "Snap-to-Freq" Inteligente (Força qualquer acidente da pauta a encaixar na escala escolhida)
-    const handleStaffClick = (clickedMidi12TET, setInputState) => {
-        if (!isMicrotonalMode) {
-            setInputState(prev => prev ? prev + ", " + clickedMidi12TET : String(clickedMidi12TET));
+    // O "Snap-to-Freq" Inteligente: Separa o comportamento da Partitura (Hz) e Piano Roll (Steps)
+    const handleStaffClick = (clickedVal, setInputState) => {
+        if (viewMode === 'roll') {
+            // PIANO ROLL: Simula um controlador MIDI estrutural (insere o número do degrau cru)
+            setInputState(prev => prev ? prev + ", " + clickedVal : String(clickedVal));
         } else {
-            const targetHz = 440 * Math.pow(2, (clickedMidi12TET - 69) / 12);
+            // PARTITURA: Visualiza frequências. Insere em Hz para a nota "colar" ao mudar de afinação!
+            const targetHz = 440 * Math.pow(2, (clickedVal - 69) / 12);
+            let realHz = targetHz;
 
-            // Removemos a limitação! Agora, clique com #, b, ou quarto-de-tom, 
-            // o sistema acha a frequência 12-TET teórica e atrai como um íman para o degrau da escala ativa mais próximo!
-            const nearestStep = Math.round(hzToMidi(targetHz));
-            const realHz = midiToHz(nearestStep);
+            if (isMicrotonalMode) {
+                const nearestStep = Math.round(hzToMidi(targetHz));
+                realHz = midiToHz(nearestStep);
+            }
 
             const formattedHz = realHz.toFixed(2) + "Hz";
             setInputState(prev => prev ? prev + ", " + formattedHz : formattedHz);
@@ -439,7 +471,11 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         const midis = hzArray.map(hzToMidi);
         return {
             midi: midis.map(m => Math.round(m)).join(', '),
-            midiCents: midis.map(m => `${Math.floor(m)}${Math.round((m % 1) * 100).toString().padStart(2, '0')}c`).join(', '),
+            midiCents: midis.map(m => {
+                const intM = Math.round(m);
+                const centsDev = Math.round((m - intM) * 100);
+                return `${intM}${centsDev >= 0 ? '+' : ''}${centsDev}c`;
+            }).join(', '),
             hz: hzArray.map(hz => `${hz.toFixed(2)}Hz`).join(', '),
             // Correção: midiToNote já faz o cálculo de cents internamente, então só chamamos a função!
             notes: midis.map(m => midiToNote(m)).join(', '),
@@ -483,7 +519,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     const [tab2InputA, setTab2InputA] = useState(""), [tab2InputB, setTab2InputB] = useState("0, 4, 7"), [tab2NonTemp, setTab2NonTemp] = useState(false);
     const [tab3Input, setTab3Input] = useState("");
     const [tab4Input, setTab4Input] = useState(""), [targetMinHz, setTargetMinHz] = useState(440), [targetMaxHz, setTargetMaxHz] = useState(880);
-    const [tab5Input, setTab5Input] = useState("0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11"), [tab5Gt12, setTab5Gt12] = useState(false), [tab5View, setTab5View] = useState("notes");
+    const [tab5Input, setTab5Input] = useState("60, 62, 64, 65, 67"), [tab5Type, setTab5Type] = useState("serial"), [tab5View, setTab5View] = useState("notes");
     const [tab6Input, setTab6Input] = useState(""), [tab6Limit, setTab6Limit] = useState(20), [tab6Order, setTab6Order] = useState(1);
     const [tab7Carrier, setTab7Carrier] = useState("440Hz"), [tab7Modulator, setTab7Modulator] = useState("100Hz"), [tab7K, setTab7K] = useState(5);
     const [tab8Input, setTab8Input] = useState(""), [tab8Harmonics, setTab8Harmonics] = useState(4), [tab8Sub, setTab8Sub] = useState(1);
@@ -593,14 +629,38 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
     const tab4MidiEquivalents = useMemo(() => tab4ResultHz.map(hzToMidi), [tab4ResultHz]);
 
+    // MOTOR DE MATRIZES UNIVERSAL (Opera em Hz e Ratios Puros para ser 100% Xenharmônico)
     const tab5Matrix = useMemo(() => {
-        let row = parseAdvancedToHz(tab5Input).map(hzToMidi);
-        if (!tab5Gt12) { const seen = new Set(); row = row.filter(m => { const pc = ((Math.round(m) % 12) + 12) % 12; if (seen.has(pc)) return false; seen.add(pc); return true; }); }
-        if (row.length < 1) return { m: [], row: [], inv: [] };
-        let p0 = row[0], inv = row.map(val => p0 - (val - p0)), matrix = [];
-        for (let r = 0; r < row.length; r++) { let mRow = []; for (let c = 0; c < row.length; c++) mRow.push(row[c] + inv[r] - p0); matrix.push(mRow); }
-        return { m: matrix, row, inv };
-    }, [tab5Input, tab5Gt12]);
+        let hzRow = parseAdvancedToHz(tab5Input);
+        if (hzRow.length < 1) return { m: [], row: [], inv: [], type: tab5Type };
+
+        let p0 = hzRow[0];
+        let matrix = [];
+        let inv = [];
+
+        if (tab5Type === 'serial') {
+            // Matriz Serial (Boulez/Schoenberg) -> Inversão Logarítmica em Hertz
+            inv = hzRow.map(f => p0 * (p0 / f));
+            for (let r = 0; r < hzRow.length; r++) {
+                let mRow = [];
+                for (let c = 0; c < hzRow.length; c++) {
+                    mRow.push(hzRow[c] * (inv[r] / p0)); // Transposição multiplicativa
+                }
+                matrix.push(mRow);
+            }
+            return { m: matrix, row: hzRow, inv: inv, type: 'serial' };
+        } else {
+            // Matriz de Intervalos (Scale Workshop Style) -> Mostra a distância exata entre as notas
+            for (let r = 0; r < hzRow.length; r++) {
+                let mRow = [];
+                for (let c = 0; c < hzRow.length; c++) {
+                    mRow.push(hzRow[c] / hzRow[r]); // O valor guardado é a Razão (Ratio) absoluta
+                }
+                matrix.push(mRow);
+            }
+            return { m: matrix, row: hzRow, inv: hzRow, type: 'interval' };
+        }
+    }, [tab5Input, tab5Type]);
 
     const tab6ResultHz = useMemo(() => {
         let baseArr = parseAdvancedToHz(tab6Input);
@@ -1112,7 +1172,13 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
                             {/* RESULTADO FIXO NO FUNDO (Não rola, fica sempre visível) */}
                             <div className="flex-none pt-3 mt-2 border-t border-gray-700">
-                                <UniversalOutput hzArray={tab1Hz} title="Entidade Gerada" isSimultaneous={true} showMelody={true} />
+                                <UniversalOutput
+                                    hzArray={tab1Hz}
+                                    title="Entidade Gerada"
+                                    isSimultaneous={true}
+                                    showMelody={true}
+                                    formatter={formatAllOutput}
+                                />
                             </div>
                         </div>
 
@@ -1218,46 +1284,146 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     </div>
                 )}
 
-                {/* ABA 5: MATRIZ DODECAFÔNICA */}
+                {/* ABA 5: MATRIZES E ANÁLISE */}
                 {activeTool === 5 && (
                     <div className="flex w-full h-full bg-gray-800">
                         <div className="w-[280px] flex-shrink-0 bg-gray-900 p-4 border-r border-gray-700 flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
                             <PullButtons onPull={setTab5Input} />
-                            <textarea value={tab5Input} onChange={e => setTab5Input(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[100px]" placeholder="Série base..." />
-                            <button onClick={() => setTab5Input("")} className="bg-red-900 text-[10px] w-full py-1.5 rounded">Limpar Série</button>
-                            <label className="text-[10px] text-orange-300"><input type="checkbox" className="mr-2" checked={tab5Gt12} onChange={e => setTab5Gt12(e.target.checked)} /> Modo Livre (&gt12 notas)</label>
+                            <textarea value={tab5Input} onChange={e => setTab5Input(e.target.value)} className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[100px]" placeholder="Coleção de notas..." />
+                            <button onClick={() => setTab5Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] w-full py-1.5 rounded transition">Limpar Entradas</button>
+
                             <div className="border-t border-gray-700 pt-3">
-                                <h4 className="text-[10px] font-bold text-gray-300 mb-1">Visualização:</h4>
-                                <select className="w-full bg-gray-800 p-1 text-xs rounded border border-gray-600" value={tab5View} onChange={e => setTab5View(e.target.value)}>
-                                    <option value="set">Set Theory (0-11)</option>
+                                <h4 className="text-[10px] font-bold text-[#00ffcc] mb-1 uppercase tracking-wider">Tipo de Matriz:</h4>
+                                <select className="w-full bg-gray-800 p-1.5 text-[11px] rounded border border-gray-600 text-white mb-2" value={tab5Type} onChange={e => setTab5Type(e.target.value)}>
+                                    <option value="serial">Matriz Serial (Original/Inversão)</option>
+                                    <option value="interval">Matriz de Intervalos (Scale Workshop)</option>
+                                </select>
+
+                                <h4 className="text-[10px] font-bold text-gray-300 mb-1 mt-2">Formato das Células:</h4>
+                                <select className="w-full bg-gray-800 p-1.5 text-[11px] rounded border border-gray-600 text-white" value={tab5View} onChange={e => setTab5View(e.target.value)}>
                                     <option value="notes">Notas Musicais</option>
-                                    <option value="hz">Frequências (Hz)</option>
-                                    <option value="quarters">Quartos de Tom</option>
+                                    <option value="cents">Desvio em Cents</option>
+                                    <option value="ratio">Ratio / Decimal</option>
+                                    <option value="hz">Frequência (Hz)</option>
                                 </select>
                             </div>
                         </div>
-                        <div className="flex-1 min-w-0 p-5 bg-gray-950 overflow-auto custom-scrollbar flex items-start justify-start">
-                            {tab5Matrix.m.length > 0 && (
-                                <table className="border-collapse bg-gray-900 border border-gray-500 shadow-2xl text-center min-w-max m-auto">
-                                    <thead><tr><th className="p-1"></th>{tab5Matrix.inv.map((v, i) => <th key={i} className="text-[10px] text-blue-300 border border-gray-700 p-2">I{tab5Gt12 ? i : v}↓</th>)}<th className="p-1"></th></tr></thead>
-                                    <tbody>
-                                        {tab5Matrix.m.map((row, rIdx) => (
-                                            <tr key={rIdx}>
-                                                <th className="text-[10px] text-green-300 border border-gray-700 p-2">P{tab5Gt12 ? rIdx : tab5Matrix.row[rIdx]}→</th>
-                                                {row.map((val, cIdx) => {
-                                                    let d = val;
-                                                    if (tab5View === 'set') d = ((Math.round(val) % 12) + 12) % 12;
-                                                    else if (tab5View === 'notes') d = formatAllOutput([midiToHz(val)]).notes;
-                                                    else if (tab5View === 'hz') d = formatAllOutput([midiToHz(val)]).hz;
-                                                    else if (tab5View === 'quarters') d = formatAllOutput([midiToHz(val)]).quarters;
-                                                    return <td key={cIdx} className={`border border-gray-700 p-2 font-mono text-[10px] ${val === tab5Matrix.m[0][0] ? 'bg-gray-800 text-red-300' : 'text-gray-300'}`}>{d}</td>;
-                                                })}
-                                                <th className="text-[10px] text-yellow-300 border border-gray-700 p-2">←R{tab5Gt12 ? rIdx : tab5Matrix.row[rIdx]}</th>
+                        <div className="flex-1 min-w-0 p-5 bg-gray-950 overflow-auto custom-scrollbar flex items-start justify-start relative">
+                            {tab5Matrix.m.length > 0 && (() => {
+                                // NOVO MOTOR DE REPRODUÇÃO DA MATRIZ
+                                const playMatrixSequence = (type, index) => {
+                                    let hzArray = [];
+                                    if (tab5Matrix.type === 'serial') {
+                                        if (type === 'P') hzArray = [...tab5Matrix.m[index]]; // Prime (Linha normal)
+                                        else if (type === 'R') hzArray = [...tab5Matrix.m[index]].reverse(); // Retrograde (Linha invertida)
+                                        else if (type === 'I') hzArray = tab5Matrix.m.map(row => row[index]); // Inversion (Coluna normal)
+                                        else if (type === 'RI') hzArray = tab5Matrix.m.map(row => row[index]).reverse(); // Ret. Inv. (Coluna de baixo para cima)
+                                    } else {
+                                        // Na matriz de intervalos, tocamos a escala base
+                                        if (type === 'P') hzArray = [...tab5Matrix.row];
+                                        else if (type === 'R') hzArray = [...tab5Matrix.row].reverse();
+                                    }
+                                    playAudio(hzArray, false); // false = toca como melodia (um a um)
+                                };
+
+                                return (
+                                    <table className="border-collapse bg-gray-900 border border-gray-500 shadow-2xl text-center min-w-max m-auto relative z-10">
+                                        <thead>
+                                            <tr>
+                                                <th className="p-1 bg-gray-950"></th>
+                                                {tab5Matrix.inv.map((val, i) => (
+                                                    <th key={i}
+                                                        className="text-[10px] text-blue-300 border border-gray-700 p-2 bg-gray-800 cursor-pointer hover:bg-blue-900 hover:text-white transition-colors"
+                                                        onClick={() => playMatrixSequence('I', i)}
+                                                        title="Ouvir Inversão"
+                                                    >
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <span>▶</span>
+                                                            <span>{tab5Type === 'serial' ? `I${i} ↓` : formatAllOutput([val]).notes}</span>
+                                                        </div>
+                                                    </th>
+                                                ))}
+                                                {tab5Type === 'serial' && <th className="p-1 bg-gray-950"></th>}
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
+                                        </thead>
+                                        <tbody>
+                                            {tab5Matrix.m.map((row, rIdx) => (
+                                                <tr key={rIdx}>
+                                                    <th className="text-[10px] text-green-300 border border-gray-700 p-2 bg-gray-800 cursor-pointer hover:bg-green-900 hover:text-white transition-colors"
+                                                        onClick={() => playMatrixSequence('P', rIdx)}
+                                                        title="Ouvir Original (Prime)"
+                                                    >
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <span>{tab5Type === 'serial' ? `P${rIdx} →` : formatAllOutput([tab5Matrix.row[rIdx]]).notes}</span>
+                                                            <span>▶</span>
+                                                        </div>
+                                                    </th>
+
+                                                    {row.map((val, cIdx) => {
+                                                        let display = "-";
+                                                        if (tab5Type === 'serial') {
+                                                            if (tab5View === 'notes') display = formatAllOutput([val]).notes;
+                                                            else if (tab5View === 'cents') {
+                                                                const centsFromRoot = 1200 * Math.log2(val / tab5Matrix.m[0][0]);
+                                                                display = `${centsFromRoot >= 0 ? '+' : ''}${centsFromRoot.toFixed(1)}c`;
+                                                            }
+                                                            else if (tab5View === 'hz') display = `${val.toFixed(2)}Hz`;
+                                                            else if (tab5View === 'ratio') display = (val / tab5Matrix.m[0][0]).toFixed(4);
+                                                        } else {
+                                                            const cents = 1200 * Math.log2(val);
+                                                            if (tab5View === 'cents') display = `${cents > 0 ? '+' : ''}${cents.toFixed(1)}c`;
+                                                            else if (tab5View === 'ratio') display = val.toFixed(4);
+                                                            else if (tab5View === 'hz') display = "-";
+                                                            else if (tab5View === 'notes') display = `${cents > 0 ? '+' : ''}${Math.round(cents)}c`;
+                                                        }
+
+                                                        const isDiagonal = tab5Type === 'interval' && rIdx === cIdx;
+                                                        const isRoot = tab5Type === 'serial' && val === tab5Matrix.m[0][0];
+
+                                                        return (
+                                                            <td key={cIdx} className={`border border-gray-700 p-2 font-mono text-[10px] ${isDiagonal || isRoot ? 'bg-gray-800 text-red-300 font-bold' : 'text-gray-300 hover:bg-gray-700 transition-colors cursor-crosshair'}`}>
+                                                                {display}
+                                                            </td>
+                                                        );
+                                                    })}
+
+                                                    {tab5Type === 'serial' && (
+                                                        <th className="text-[10px] text-yellow-300 border border-gray-700 p-2 bg-gray-800 cursor-pointer hover:bg-yellow-900 hover:text-white transition-colors"
+                                                            onClick={() => playMatrixSequence('R', rIdx)}
+                                                            title="Ouvir Retrógrado"
+                                                        >
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                <span>◀</span>
+                                                                <span>← R{rIdx}</span>
+                                                            </div>
+                                                        </th>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        {tab5Type === 'serial' && (
+                                            <tfoot>
+                                                <tr>
+                                                    <th className="p-1 bg-gray-950"></th>
+                                                    {tab5Matrix.inv.map((val, i) => (
+                                                        <th key={i}
+                                                            className="text-[10px] text-purple-300 border border-gray-700 p-2 bg-gray-800 cursor-pointer hover:bg-purple-900 hover:text-white transition-colors"
+                                                            onClick={() => playMatrixSequence('RI', i)}
+                                                            title="Ouvir Retrógrado da Inversão"
+                                                        >
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                <span>↑ RI{i}</span>
+                                                                <span>◀</span>
+                                                            </div>
+                                                        </th>
+                                                    ))}
+                                                    <th className="p-1 bg-gray-950"></th>
+                                                </tr>
+                                            </tfoot>
+                                        )}
+                                    </table>
+                                );
+                            })()}
                         </div>
                     </div>
                 )}
