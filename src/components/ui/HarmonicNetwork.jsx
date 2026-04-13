@@ -8,6 +8,7 @@ import GrandStaffVisualizer from "../visualizers/GrandStaffVisualizer";
 import StaffToolbar from "../visualizers/StaffToolbar";
 import { parseScalaFile, generateEdoScale, parseCustomTuning } from "../../utils/scalaParser";
 import { useMidi } from "../../context/MidiContext";
+import { generateNotationData } from "../../utils/notationEngine";
 
 const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -546,8 +547,9 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
     // ABA 14 - NOTAÇÃO MICROTONAL
     const [tab14Input, setTab14Input] = useState("");
-    const [notationSystem, setNotationSystem] = useState("auto"); // "auto", "he" (Helmholtz-Ellis), "sagittal"
-    const [sagittalLevel, setSagittalLevel] = useState("spartan"); // "spartan", "athenian"
+    const [notationSystem, setNotationSystem] = useState("cents");
+    const [sagittalLevel, setSagittalLevel] = useState("spartan");
+    const [showPitchBends, setShowPitchBends] = useState(false); // NOVO: Toggle Pitch Bends
 
     // MOTORES (MEMOIZED)
     const points = useMemo(() => {
@@ -1910,11 +1912,11 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                 >
                                     <option value="auto">Automático (Sugerido pela Escala)</option>
                                     <option value="cents">Nota + Cents (Exato/Universal)</option>
-                                    <option value="he">Helmholtz-Ellis (Just Intonation)</option>
-                                    <option value="sagittal">Sagittal (JI & EDOs)</option>
+                                    <option value="ji">Just Intonation Puro (HEJI + Dados)</option>
+                                    <option value="he">Helmholtz-Ellis (Comas 5/7/11)</option>
+                                    <option value="sagittal">Sagittal (Spartan Universal)</option>
                                     <option value="quarter">Quartos de Tom (24-EDO)</option>
                                     <option value="sixth">Sextos de Tom (36-EDO)</option>
-                                    <option value="eighth">Oitavos de Tom (48-EDO)</option>
                                 </select>
 
                                 {notationSystem === 'sagittal' && (
@@ -1937,43 +1939,157 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                 <textarea
                                     value={tab14Input}
                                     onChange={e => setTab14Input(e.target.value)}
-                                    className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[80px]"
+                                    className="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 font-mono min-h-[60px]"
                                     placeholder="Ex: 60, 64.5, 67 (Puxe das abas)"
                                 />
                                 <button onClick={() => setTab14Input("")} className="bg-red-900 hover:bg-red-800 text-[10px] w-full py-1.5 rounded mt-2 transition">Limpar Notas</button>
                             </div>
 
+                            <div className="mt-3 bg-gray-950 p-2 rounded border border-gray-700">
+                                <label className="flex items-center text-[10px] text-[#00ffcc] font-bold cursor-pointer">
+                                    <input type="checkbox" checked={showPitchBends} onChange={e => setShowPitchBends(e.target.checked)} className="mr-2 accent-[#00ffcc]" />
+                                    Mostrar Software Pitch Bends
+                                </label>
+                            </div>
+
                             <div className="mt-auto pt-4 border-t border-gray-700">
                                 <div className="text-[10px] text-gray-400 mb-1">Dica de Notação:</div>
                                 <div className="bg-gray-950 p-2 rounded border border-gray-700 text-gray-300 font-mono text-[9px] shadow-inner leading-relaxed">
-                                    {notationSystem === 'auto' && "O sistema escolherá HE para Just Intonation e Sagittal para divisões iguais complexas (EDOs)."}
-                                    {notationSystem === 'cents' && "Mantém o acidente 12-TET normal e adiciona o desvio exato em cents acima da nota. Perfeito para qualquer afinação."}
-                                    {notationSystem === 'he' && "HE (Sabat/Schweinitz) usa setas para o limite-5 (vírgula sintônica) e ganchos para o limite-7. Ideal para Just Intonation."}
-                                    {notationSystem === 'sagittal' && "Sagittal usa flechas específicas para medir comas puras ou divisões de EDO. O nível Spartan cobre o essencial."}
-                                    {notationSystem === 'quarter' && "Aproximação para 24-EDO. Usa meios-sustenidos (cruz com uma haste) e meios-bemóis (b invertido)."}
-                                    {notationSystem === 'sixth' && "Aproximação para 36-EDO. Utiliza setas direcionais nos acidentes clássicos para indicar +/- 33.3 cents."}
-                                    {notationSystem === 'eighth' && "Aproximação para 48-EDO. Combina acidentes de quarto-de-tom com setas de oitavo-de-tom (Stein-Zimmermann)."}
+                                    {notationSystem === 'cents' && "Mantém o acidente 12-TET normal e adiciona o desvio em cents. Universal."}
+                                    {notationSystem === 'ji' && "Modo Analítico. Mostra o símbolo HEJI e foca nos desvios exatos em Cents e Hz sobre a nota."}
+                                    {notationSystem === 'quarter' && "Aproximação 24-EDO. Utiliza meios-bemóis espelhados e sustenidos compostos (Gould)."}
+                                    {notationSystem === 'sixth' && "Aproximação 36-EDO. Setas nos acidentes clássicos para desvios de +/- 33.3c."}
+                                    {notationSystem === 'he' && "Helmholtz-Ellis. Setas para o limite-5 (Coma Sintónica)."}
+                                    {notationSystem === 'sagittal' && "Sagittal (Spartan). Flechas puras que mapeiam as vírgulas principais."}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex-1 min-w-0 p-6 bg-gray-950 flex flex-col justify-center items-center overflow-auto custom-scrollbar relative">
-                            {/* AQUI ENTRARÁ O NOVO MOTOR SVG DA PAUTA MICROTONAL */}
-                            <div className="w-full max-w-4xl bg-[#fdfdfd] h-64 rounded shadow-2xl border border-gray-300 flex items-center justify-center relative overflow-hidden">
+                        <div className="flex-1 min-w-0 bg-gray-950 flex flex-col items-center justify-start relative">
 
-                                {/* Linhas do Pentagrama Falsas (Placeholder) */}
-                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20">
-                                    <div className="w-[90%] h-[1px] bg-black mb-2"></div>
-                                    <div className="w-[90%] h-[1px] bg-black mb-2"></div>
-                                    <div className="w-[90%] h-[1px] bg-black mb-2"></div>
-                                    <div className="w-[90%] h-[1px] bg-black mb-2"></div>
-                                    <div className="w-[90%] h-[1px] bg-black"></div>
-                                </div>
-
-                                <span className="text-gray-400 font-bold tracking-widest uppercase z-10 text-sm">
-                                    Motor de Renderização SMuFL em Construção...
-                                </span>
+                            {/* CABEÇALHO ANALÍTICO E ESCALA */}
+                            <div className="absolute top-4 left-6 z-20 text-[10px] font-mono bg-gray-900 border border-gray-600 text-white px-3 py-1.5 rounded shadow-lg opacity-90">
+                                {activeTuning.type === 'edo'
+                                    ? <span className="text-[#00ffcc] font-bold">{activeTuning.divisions}-EDO | 1 step = {(1200 / activeTuning.divisions).toFixed(2)}¢</span>
+                                    : <span className="text-yellow-400 font-bold">Just Intonation (JI) / Afinação Customizada</span>
+                                }
                             </div>
+
+                            {(() => {
+                                const hzArr = parseAdvancedToHz(tab14Input);
+                                if (hzArr.length === 0) return <div className="absolute inset-0 flex items-center justify-center text-gray-500 font-bold tracking-widest uppercase">Aguardando Notas...</div>;
+
+                                const notesData = generateNotationData(hzArr, baseHz, baseMidi, notationSystem);
+
+                                const TABLE_Y = 100;
+                                const minY = Math.min(-80, ...notesData.map(n => n.y - 60));
+                                const maxY = Math.max(TABLE_Y + 120, ...notesData.map(n => n.y + 60));
+                                const viewBoxHeight = maxY - minY;
+                                const svgWidth = Math.max(800, notesData.length * 85 + 150);
+
+                                return (
+                                    <div className="w-full h-full overflow-auto custom-scrollbar p-6 bg-[#fdfdfd]">
+                                        <svg width={svgWidth} height={viewBoxHeight * 1.3} viewBox={`0 ${minY} ${svgWidth} ${viewBoxHeight}`} style={{ display: 'block', margin: 'auto' }}>
+
+                                            {/* LINHAS DA CLAVE DE SOL E FÁ (100% OPACAS E NÍTIDAS) */}
+                                            {[-10, -20, -30, -40, -50].map(yLine => (
+                                                <line key={`t${yLine}`} x1="30" y1={yLine} x2="98%" y2={yLine} stroke="#000" strokeWidth="1" opacity="1.0" />
+                                            ))}
+                                            {[20, 30, 40, 50, 60].map(yLine => (
+                                                <line key={`b${yLine}`} x1="30" y1={yLine} x2="98%" y2={yLine} stroke="#000" strokeWidth="1" opacity="1.0" />
+                                            ))}
+
+                                            {/* CLAVES TIPOGRÁFICAS (Bravura Oficial) */}
+                                            {/* Clave de Sol (\uE050) posicionada no Y exato da linha G4 (-20) */}
+                                            <text x="35" y="-20" fontSize="42" fontFamily="HEJI2Bravura, serif" fill="#000">{'\uE050'}</text>
+
+                                            {/* Clave de Fá (\uE062) posicionada no Y exato da linha F3 (30) */}
+                                            <text x="35" y="30" fontSize="42" fontFamily="HEJI2Bravura, serif" fill="#000">{'\uE062'}</text>
+
+                                            {/* CHAVE DE UNIÃO (Bracket) */}
+                                            <line x1="30" y1="-50" x2="30" y2="60" stroke="#000" strokeWidth="3" />
+                                            <path d="M20,-50 L30,-50 C15,-50 15,-20 15,5 C15,30 15,60 30,60 L20,60" fill="none" stroke="#000" strokeWidth="2.5" />
+
+                                            <line x1="30" y1={TABLE_Y} x2="98%" y2={TABLE_Y} stroke="#ccc" strokeWidth="1" strokeDasharray="5 5" />
+
+                                            {/* DESENHO DAS NOTAS */}
+                                            {notesData.map(note => {
+                                                const isTreble = note.step >= 0;
+                                                const stemDown = note.step >= (isTreble ? 6 : -6);
+
+                                                // Cálculos de Software Pitch Bends
+                                                let pbVal = Math.round(8192 + (note.centsDev * 40.96));
+                                                pbVal = Math.max(0, Math.min(16383, pbVal));
+                                                const sibLSB = pbVal & 0x7F;
+                                                const sibMSB = (pbVal >> 7) & 0x7F;
+                                                const doricoDelta = (note.centsDev * 10).toFixed(0);
+
+                                                return (
+                                                    <g key={note.id}>
+
+                                                        {/* NOTA FÍSICA E LINHAS SUPLEMENTARES */}
+                                                        <g transform={`translate(${note.x}, ${note.y})`}>
+                                                            {note.ledgers.map(lY => (
+                                                                <line key={lY} x1="-14" y1={lY - note.y} x2="14" y2={lY - note.y} stroke="#000" strokeWidth="2" />
+                                                            ))}
+
+                                                            {/* Cabeça e Haste */}
+                                                            <ellipse cx="0" cy="0" rx="5.5" ry="4" fill="#000" transform="rotate(-20)" />
+                                                            <line x1={stemDown ? -5 : 5} y1="0" x2={stemDown ? -5 : 5} y2={stemDown ? 30 : -30} stroke="#000" strokeWidth="1.5" />
+
+                                                            {/* SÍMBOLO MICROTONAL (USANDO A FONTE BRAVURA OU HEJI2) */}
+                                                            <text
+                                                                x={note.xOffset}
+                                                                y={note.yOffset}
+                                                                fontSize={note.fontSize}
+                                                                fontFamily={note.font}
+                                                                fill="#000"
+                                                                textAnchor="start"
+                                                            >
+                                                                {note.char}
+                                                            </text>
+
+                                                            {/* LABELS DE CENTS */}
+                                                            {(notationSystem === 'cents' || notationSystem === 'ji') && (
+                                                                <text x="0" y={stemDown ? -20 : 35} fontSize="10" fontFamily="monospace" fill="#e04e8a" textAnchor="middle" fontWeight="bold">
+                                                                    {note.centsLabel}
+                                                                </text>
+                                                            )}
+                                                            {notationSystem === 'ji' && (
+                                                                <text x="0" y={stemDown ? -32 : 47} fontSize="9" fontFamily="sans-serif" fill="#1e90ff" textAnchor="middle" fontWeight="bold">
+                                                                    {note.hz.toFixed(2)}Hz
+                                                                </text>
+                                                            )}
+                                                        </g>
+
+                                                        {/* TABELA DE SOFTWARE PITCH BENDS (Inalterada, continua perfeita) */}
+                                                        {showPitchBends ? (
+                                                            <g transform={`translate(${note.x}, ${TABLE_Y + 15})`}>
+                                                                <text x="0" y="0" fontSize="8" fill="#777" textAnchor="middle" fontFamily="sans-serif">nearest diatonic</text>
+                                                                <text x="0" y="10" fontSize="9" fill="#000" textAnchor="middle" fontFamily="sans-serif" fontWeight="bold">MIDI {note.nearestMidi}</text>
+
+                                                                <rect x="-38" y="18" width="76" height="55" rx="4" fill="#f4f4f4" stroke="#ccc" />
+
+                                                                <text x="-33" y="32" fontSize="7.5" fill="#333" textAnchor="start" fontFamily="monospace">Sibelius: <tspan fill="#1e90ff" fontWeight="bold">~B {sibLSB},{sibMSB}</tspan></text>
+                                                                <text x="-33" y="44" fontSize="7.5" fill="#333" textAnchor="start" fontFamily="monospace">Dorico pb: <tspan fill="#1e90ff" fontWeight="bold">{doricoDelta}</tspan></text>
+                                                                <text x="-33" y="56" fontSize="7.5" fill="#333" textAnchor="start" fontFamily="monospace">MuseScore: <tspan fill="#1e90ff" fontWeight="bold">{note.centsDev.toFixed(2)}c</tspan></text>
+
+                                                                <text x="0" y="86" fontSize="10" fill="#e04e8a" textAnchor="middle" fontFamily="monospace" fontWeight="bold">{note.hz.toFixed(2)} Hz</text>
+                                                            </g>
+                                                        ) : (
+                                                            notationSystem !== 'ji' && (
+                                                                <text x={note.x} y={TABLE_Y + 15} fontSize="9" fill="#888" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
+                                                                    {note.hz.toFixed(1)}Hz
+                                                                </text>
+                                                            )
+                                                        )}
+                                                    </g>
+                                                );
+                                            })}
+                                        </svg>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 )}

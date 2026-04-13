@@ -1,0 +1,9 @@
+@font-face {
+    font-family: 'HEJI2';
+    src: url('/fonts/HEJI2.otf') format('opentype');
+}
+
+@font-face {
+    font-family: 'HEJI2Bravura';
+    src: url('/fonts/HEJI2Bravura.otf') format('opentype');
+}

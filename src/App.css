@@ -7,6 +7,30 @@
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap');
 
+@font-face {
+  font-family: 'HEJI2';
+  src: url('/fonts/HEJI2.otf') format('opentype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Bravura';
+  src: url('/fonts/Bravura.woff2') format('woff2'),
+    url('/fonts/Bravura.otf') format('opentype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HEJI2Bravura';
+  src: url('/fonts/HEJI2Bravura.otf') format('opentype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Microtonal';
+  src: url('/fonts/Microtonal.TTF') format('truetype');
+  font-display: swap;
+}
 
 :root {
   --radius-sm: calc(var(--radius) - 4px);
