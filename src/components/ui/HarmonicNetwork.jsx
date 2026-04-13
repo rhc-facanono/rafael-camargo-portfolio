@@ -314,6 +314,43 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         accidentalModifier, setAccidentalModifier, // Traz de volta os acidentes
         globalSnap, setGlobalSnap                  // Traz de volta o Snap Global
     } = useTuning();
+    // ==========================================
+    // SISTEMA DE AJUDA CONTEXTUAL (MODAL)
+    // ==========================================
+    const [activeHelpModal, setActiveHelpModal] = useState(null);
+
+    const helpDictionary = {
+        1: { title: "Escala Base & Referência", text: "Toda a música precisa de uma âncora. O padrão mundial é o Lá (A4) a 440Hz, mas orquestras barrocas usam 415Hz ou 432Hz. \n\nCOMO USAR:\nDefina a sua nota de referência e a frequência. Todas as outras abas vão usar este 'Ponto Zero' para calcular as escalas." },
+        2: { title: "Temperamentos (EDO)", text: "EDO significa 'Equal Divisions of the Octave'. O piano normal divide a oitava em 12 fatias (12-EDO). \n\nCOMO USAR:\nSe escrever '19' ou '24' (quartos de tom árabes), o software fatia a oitava nessas partes iguais. Isso cria notas alienígenas e destrói a noção clássica de Sustenido e Bemol." },
+        3: { title: "Série Harmónica (Overtone)", text: "Quando toca uma corda, ela vibra inteira, mas também vibra na metade (oitava), num terço (quinta), num quarto... \n\nCOMO USAR:\nInsira a quantidade de harmónicos. O software vai gerar as frequências naturais da física do som. Estes acordes soam divinamente puros." },
+        4: { title: "Série Sub-Harmónica (Undertone)", text: "É o espelho sombrio da Série Harmónica. Em vez de multiplicar a frequência, nós dividimo-la. \n\nCOMO USAR:\nGera escalas espectrais 'invertidas' que soam densas e melancólicas. Muito usado em síntese sonora pesada." },
+        5: { title: "Afinação Justa (Just Intonation)", text: "A Afinação Justa (JI) abandona os temperamentos e usa frações matemáticas puras (ex: 3/2 para uma Quinta Justa perfeita). \n\nCOMO USAR:\nIntroduza frações. A música vai soar cristalina, sem os 'batimentos' ou trepidações do piano moderno." },
+        6: { title: "Rede Harmónica 2D (Tonnetz)", text: "A pauta clássica é confusa para microtons. O 'Tonnetz' é um mapa geométrico onde ir para a direita sobe uma Quinta, e ir para cima sobe uma Terça. \n\nCOMO USAR:\nVisualize modulações e observe que acordes estão fisicamente 'próximos' no mundo do som." },
+        7: { title: "Calculadora de Cents", text: "O 'Cent' é uma unidade microscópica: 1 semitom tem 100 Cents. \n\nCOMO USAR:\nInsira duas frequências quaisquer para saber a distância exata entre elas. É a fita métrica do microtonalismo." },
+        8: { title: "Mapeamento MIDI", text: "Como tocar microtons num teclado de 12 teclas? \n\nCOMO USAR:\nCrie o mapa de como as notas da sua escala (ex: 19 notas) se vão espalhar fisicamente pelas teclas brancas e pretas do seu controlador MIDI." },
+        9: { title: "Morphing de Escalas", text: "A magia da transição. \n\nCOMO USAR:\nEscolha uma escala A (ex: piano normal) e uma escala B (ex: afinação indonésia). O software calcula os passos intermédios para que a música 'derreta' lentamente de uma afinação para a outra." },
+        10: { title: "Batimentos Acústicos", text: "Quando duas notas estão quase na mesma frequência, elas 'pulsam' (waw-waw). \n\nCOMO USAR:\nO software diz-lhe a velocidade desse pulso em Hertz. Útil para criar texturas rítmicas com notas longas." },
+        11: { title: "Escalas Não-Oitavantes", text: "A quebra do maior tabu da música. \n\nCOMO USAR:\nA oitava (2/1) é banida. A escala repete-se, por exemplo, a cada Quinta, ou a cada Oitava-e-meia (Escala de Bohlen-Pierce). Cria acordes alienígenas onde Maior e Menor deixam de existir." },
+        12: { title: "Academia Xenharmónica", text: "Você está no Manual Completo. Leia as definições de todas as técnicas." },
+        13: { title: "Visualizador 3D", text: "A evolução da Rede Harmónica 2D. \n\nCOMO USAR:\nNavegue pelo espaço tridimensional dos sons. Quintas, terças e sétimas expandem-se em eixos Z, permitindo analisar a 'densidade' de clusters modernos." },
+        14: { title: "Editor de Notação Profissional", text: "Traduz toda a matemática em partituras reais. \n\nCOMO USAR:\nCole as frequências ou as puxe das abas. Escolha entre HEJI (para Acordes Puros), Sagittal (Notação Avançada) ou Cents para exportar para o seu DAW (Sibelius/Dorico)." }
+    };
+
+    // RENDERIZADOR DO MODAL DE AJUDA
+    const renderHelpModal = () => {
+        if (!activeHelpModal) return null;
+        const helpData = helpDictionary[activeHelpModal];
+        return (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 backdrop-blur-sm">
+                <div className="bg-gray-900 border border-gray-600 rounded-xl shadow-2xl w-[90%] max-w-md p-6 relative">
+                    <button onClick={() => setActiveHelpModal(null)} className="absolute top-4 right-4 text-gray-400 hover:text-white bg-gray-800 hover:bg-red-600 w-8 h-8 rounded-full flex items-center justify-center transition-all font-bold">✕</button>
+                    <h2 className="text-xl font-bold text-yellow-500 mb-4 border-b border-gray-700 pb-2">{helpData.title}</h2>
+                    <div className="text-gray-300 font-sans text-sm whitespace-pre-wrap leading-relaxed">{helpData.text}</div>
+                    <button onClick={() => setActiveHelpModal(null)} className="mt-6 w-full py-2 bg-[#00ffcc] text-black font-bold rounded hover:bg-[#00ccaa] transition">Entendi</button>
+                </div>
+            </div>
+        );
+    };
 
     // ==========================================
     // MOTORES GLOBAIS COM ÂNCORAS DINÂMICAS E SNAP-TO-FREQ
@@ -1079,6 +1116,9 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     return (
         <div className="w-full h-full relative flex flex-col bg-gray-950 font-sans text-white">
 
+            {/* RENDERIZA O POP-UP DE AJUDA SE ESTIVER ATIVO */}
+            {renderHelpModal()}
+
             {/* BARRA GLOBAL SUPERIOR: Fica fora do caminho de tudo */}
             <div className="w-full bg-gray-900 border-b border-gray-700 p-2 flex justify-end items-center z-50 shadow-md gap-6">
 
@@ -1782,69 +1822,64 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                     </div>
                 )}
 
-                {/* ABA 12: MANUAL DO USUÁRIO */}
+                {/* ABA 12: MANUAL DO USUÁRIO E ACADEMIA */}
                 {activeTool === 12 && (
-                    <div className="flex w-full h-full bg-gray-900 overflow-y-auto custom-scrollbar p-8 justify-center">
-                        <div className="max-w-4xl w-full text-gray-300 space-y-8 pb-12">
+                    <div className="flex flex-col w-full h-full bg-[#0d1117] p-8 overflow-y-auto custom-scrollbar items-center">
+                        <div className="max-w-5xl w-full bg-gray-900 rounded-2xl shadow-2xl border border-gray-700 p-10 mb-12">
 
-                            <div className="border-b border-gray-700 pb-4 mb-6">
-                                <h2 className="text-3xl font-bold text-white mb-2 tracking-wide">Manual do Sistema Harmônico</h2>
-                                <p className="text-gray-400">Guia de referência para todas as funcionalidades, sínteses e cálculos da plataforma.</p>
+                            <div className="border-b border-gray-800 pb-6 mb-8">
+                                <h1 className="text-3xl font-bold text-[#00ffcc] mb-2 font-serif">Manual de Operação do Sistema</h1>
+                                <p className="text-gray-400 text-sm">Guia de referência rápida para todas as ferramentas e atalhos.</p>
                             </div>
 
-                            <section className="space-y-4">
-                                <h3 className="text-xl font-bold text-[#00ffcc] uppercase tracking-widest border-l-4 border-[#00ffcc] pl-3">Controles Globais</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
-                                        <h4 className="font-bold text-white mb-1">Modo Xenharmônico (Toggle)</h4>
-                                        <p className="text-sm">Abandona os 12 semitons. Quando ativo, o aplicativo calcula áudio e matemática com base na afinação escolhida na Aba 11 (ex: 19-TET, Scala). A nota Dó Central (60) é a âncora fixa em 261.625 Hz.</p>
-                                    </div>
-                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
-                                        <h4 className="font-bold text-white mb-1">Atalho Alt + Setas</h4>
-                                        <p className="text-sm">Ao clicar em qualquer caixa de texto, pressione <code className="bg-gray-950 px-1 rounded text-orange-300">Alt + ↑</code> ou <code className="bg-gray-950 px-1 rounded text-orange-300">Alt + ↓</code> para transpor instantaneamente a última nota digitada em um degrau.</p>
-                                    </div>
-                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
-                                        <h4 className="font-bold text-white mb-1">Botões "Puxar de:"</h4>
-                                        <p className="text-sm">Servem para transferir resultados entre abas. Gere um acorde na Rede 3D e clique em "Puxar de: Rede" na Aba de Síntese FM para enviar as notas para lá.</p>
-                                    </div>
-                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
-                                        <h4 className="font-bold text-white mb-1">Barra de Acidentes (Partitura)</h4>
-                                        <p className="text-sm">Arme os botões de Bemol, Sustenido ou Quartos-de-tom e faça <code className="bg-gray-950 px-1 rounded text-orange-300">Ctrl + Clique</code> na pauta para inserir a nota alterada.</p>
-                                    </div>
-                                </div>
-                            </section>
+                            <div className="space-y-10 text-gray-300 leading-relaxed text-sm">
+                                <section>
+                                    <h2 className="text-xl font-bold text-yellow-500 mb-4 border-l-4 border-yellow-500 pl-3 bg-gray-800 py-2">I. Controles Globais (Barra Superior)</h2>
+                                    <ul className="space-y-3">
+                                        <li><strong className="text-white">Toggle Xenharmônico / 12-TET:</strong> Alterna o motor matemático de todo o software. Em 12-TET, o sistema limita-se às afinações de piano padrão. Em modo Xenharmônico, os cálculos respondem à afinação ativa estipulada na Aba 11.</li>
+                                        <li><strong className="text-white">Quantizar (Snap Global):</strong> Um interruptor essencial para módulos que geram frequências quebradas (como Ring Modulation ou FM). Quando ativado (azul), o algoritmo fará uma varredura sobre as frequências geradas e irá forçá-las (snap) a assumir o degrau mais próximo da sua afinação atual.</li>
+                                    </ul>
+                                </section>
 
-                            <section className="space-y-4">
-                                <h3 className="text-xl font-bold text-blue-400 uppercase tracking-widest border-l-4 border-blue-400 pl-3">Módulos de Ferramentas</h3>
+                                <section>
+                                    <h2 className="text-xl font-bold text-pink-400 mb-4 border-l-4 border-pink-400 pl-3 bg-gray-800 py-2">II. Interação e Atalhos</h2>
+                                    <ul className="space-y-3">
+                                        <li><strong className="text-white">Inserção no Pentagrama:</strong> Para inserir notas visualmente nas pautas (SVG), você deve posicionar o mouse, <code className="bg-gray-950 text-orange-300 px-1 rounded">segurar a tecla Ctrl e clicar</code>.</li>
+                                        <li><strong className="text-white">Atalho de Transposição (Alt + Setas):</strong> Clique numa caixa de texto de entrada para dar foco. Pressione <code className="bg-gray-950 text-orange-300 px-1 rounded">Alt + Seta Cima</code> ou <code className="bg-gray-950 text-orange-300 px-1 rounded">Seta Baixo</code> para transpor a última nota da lista em 1 passo da escala atual.</li>
+                                        <li><strong className="text-white">Botões "Puxar de":</strong> Presentes no topo das abas, inserem a resposta gerada noutra ferramenta diretamente na entrada da aba atual.</li>
+                                    </ul>
+                                </section>
 
-                                <div className="space-y-3">
-                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
-                                        <h4 className="font-bold text-white">1. Redes Harmônicas 3D</h4>
-                                        <p className="text-sm mt-1">Navegue por um labirinto geométrico. <strong>X, Y, Z</strong> definem a distância dos eixos. Segure <strong>Ctrl + Clique</strong> nas esferas 3D para gerar os acordes baseados em distâncias simétricas.</p>
+                                <section>
+                                    <h2 className="text-xl font-bold text-[#00ffcc] mb-4 border-l-4 border-[#00ffcc] pl-3 bg-gray-800 py-2">III. Lógica Operacional por Seção</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="bg-gray-950 p-4 rounded border border-gray-700">
+                                            <strong className="text-white block mb-1 text-base">Aba 1 (Redes 3D)</strong> O dropdown centraliza o mapa. Os eixos (X, Y, Z) aceitam passos ou Cents puros. O botão "Cent. Câm" reseta o visualizador.
+                                        </div>
+                                        <div className="bg-gray-950 p-4 rounded border border-gray-700">
+                                            <strong className="text-white block mb-1 text-base">Aba 2 (Multiplicação)</strong> Calcula a transposição de um acorde sobre cada nota de outro acorde, gerando fractais harmônicos.
+                                        </div>
+                                        <div className="bg-gray-950 p-4 rounded border border-gray-700">
+                                            <strong className="text-white block mb-1 text-base">Aba 3 & 4 (Módulos e Projeções)</strong> Repete ciclicamente uma entidade melódica, ou estica/comprime a afinação para caber num espaço fixo de Hertz.
+                                        </div>
+                                        <div className="bg-gray-950 p-4 rounded border border-gray-700">
+                                            <strong className="text-white block mb-1 text-base">Aba 5 (Matriz)</strong> Gera matrizes Seriais ou de Intervalo (Estilo Scale Workshop). Útil para dodecafonismo microtonal.
+                                        </div>
+                                        <div className="bg-gray-950 p-4 rounded border border-gray-700">
+                                            <strong className="text-white block mb-1 text-base">Aba 6 & 7 (Ring Mod & FM)</strong> Moduladores acústicos. Gere frequências em cascata baseadas na soma/diferença ou bandas laterais (K).
+                                        </div>
+                                        <div className="bg-gray-950 p-4 rounded border border-gray-700">
+                                            <strong className="text-white block mb-1 text-base">Aba 9 (Costère)</strong> Analisa a "Densidade Cardinal". Os números indicam "polos de atração" para onde as notas querem resolver.
+                                        </div>
+                                        <div className="bg-gray-950 p-4 rounded border border-gray-700">
+                                            <strong className="text-white block mb-1 text-base">Aba 10 (Interpolação)</strong> Faz o "morphing" gradual no tempo. Deslize o slider para derreter a afinação da Entidade A até à Entidade B.
+                                        </div>
+                                        <div className="bg-gray-950 p-4 rounded border border-gray-700">
+                                            <strong className="text-white block mb-1 text-base">Aba 11 (Afinações)</strong> A Bússola. Define a âncora (ex: MIDI 60 = 261.62Hz) e carrega escalas .SCL ou EDOs para todo o sistema.
+                                        </div>
                                     </div>
-
-                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
-                                        <h4 className="font-bold text-white">2. Multiplicação de Acordes</h4>
-                                        <p className="text-sm mt-1">Transpõe o acorde A sobre cada nota do acorde B. O modo <strong>Valores Não Temperados</strong> faz a multiplicação pura em Hertz (Just Intonation), criando clusters microtonais absolutos.</p>
-                                    </div>
-
-                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
-                                        <h4 className="font-bold text-white">3. Módulos Cíclicos & 4. Projeções Proporcionais</h4>
-                                        <p className="text-sm mt-1"><strong>Módulos:</strong> Repete uma célula até fechar oitava. <strong>Projeções:</strong> Estica ou comprime o intervalo total do acorde para caber entre um novo Min (Hz) e Max (Hz).</p>
-                                    </div>
-
-                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
-                                        <h4 className="font-bold text-white">6. Ring Modulation & 7. Síntese FM</h4>
-                                        <p className="text-sm mt-1"><strong>RM:</strong> Multiplica as portadoras, gerando frequências de soma e diferença. <strong>FM:</strong> Uma moduladora cria bandas laterais (Sidebands) em torno da portadora baseada no Índice K.</p>
-                                    </div>
-
-                                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
-                                        <h4 className="font-bold text-white">9. Calc. Costère & 10. Interpolações</h4>
-                                        <p className="text-sm mt-1"><strong>Costère:</strong> Mostra o mapa de gravidade do acorde (para onde ele "quer" resolver). <strong>Interpolação:</strong> O slider faz o "morphing" gradual no tempo entre um acorde A e um acorde B.</p>
-                                    </div>
-                                </div>
-                            </section>
-
+                                </section>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1904,7 +1939,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                             <PullButtons onPull={setTab14Input} />
 
                             <div>
-                                <h3 className="text-yellow-400 font-bold text-[10px] uppercase mb-2 tracking-wider">Configuração da Partitura</h3>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-yellow-400 font-bold text-[10px] uppercase tracking-wider">Configuração da Partitura</h3>
+                                    <button onClick={() => setActiveHelpModal(14)} className="w-5 h-5 rounded-full border border-gray-500 text-gray-400 flex items-center justify-center text-[10px] font-bold hover:bg-[#00ffcc] hover:text-black hover:border-[#00ffcc] transition-all shadow-sm" title="Ajuda desta Ferramenta">?</button>
+                                </div>
                                 <label className="text-xs text-gray-400 mb-1 block">Sistema de Acidentes:</label>
                                 <select
                                     value={notationSystem}
@@ -1915,24 +1953,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     <option value="cents">Nota + Cents (Exato/Universal)</option>
                                     <option value="ji">Just Intonation Puro (HEJI + Dados)</option>
                                     <option value="he">Helmholtz-Ellis (Comas 5/7/11)</option>
-                                    <option value="sagittal">Sagittal (Spartan Universal)</option>
+                                    <option value="sagittal">Sagittal (Athenian Avançado)</option>
                                     <option value="quarter">Quartos de Tom (24-EDO)</option>
                                     <option value="sixth">Sextos de Tom (36-EDO)</option>
                                 </select>
-
-                                {notationSystem === 'sagittal' && (
-                                    <div className="mb-3">
-                                        <label className="text-xs text-gray-400 mb-1 block">Nível Sagittal:</label>
-                                        <select
-                                            value={sagittalLevel}
-                                            onChange={e => setSagittalLevel(e.target.value)}
-                                            className="w-full bg-gray-800 text-[11px] p-2 rounded border border-gray-600 text-white"
-                                        >
-                                            <option value="spartan">Spartan (Básico - EDOs até 72)</option>
-                                            <option value="athenian">Athenian (Avançado)</option>
-                                        </select>
-                                    </div>
-                                )}
                             </div>
 
                             <div>
@@ -1953,82 +1977,148 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                 </label>
                             </div>
 
-                            {/* GLOSSÁRIO DINÂMICO DE SÍMBOLOS (EXPANDIDO) */}
+                            {/* ENCICLOPÉDIA DE SÍMBOLOS (HEJI & SAGITTAL COMPLETOS) */}
                             <div className="mt-auto pt-4 border-t border-gray-700">
-                                <h4 className="text-[10px] text-yellow-500 font-bold uppercase mb-2">Glossário Técnico & Prático:</h4>
-                                <div className="bg-gray-950 p-3 rounded border border-gray-700 text-gray-300 font-mono text-[10px] shadow-inner leading-relaxed overflow-y-auto max-h-[300px] custom-scrollbar">
+                                <h4 className="text-[10px] text-yellow-500 font-bold uppercase mb-2">Enciclopédia de Símbolos (Subir / Descer):</h4>
+                                <div className="bg-gray-950 p-3 rounded border border-gray-700 text-gray-300 font-mono text-[9px] shadow-inner leading-relaxed overflow-y-auto max-h-[400px] custom-scrollbar">
+
+                                    {/* ========================================= */}
+                                    {/* GLOSSÁRIO HEJI (SABAT/SCHWEINITZ)         */}
+                                    {/* ========================================= */}
+                                    {(notationSystem === 'he' || notationSystem === 'ji' || notationSystem === 'auto') && (
+                                        <div className="space-y-4">
+                                            <p className="text-white border-b border-gray-800 pb-1 font-bold uppercase tracking-widest text-[10px]">HEJI - Limites Harmônicos</p>
+
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>f d</span>
+                                                <p><b className="text-yellow-400">Limite-5 (±21.5¢):</b> Coma Sintónica. Usada para correção direta de terças e sextas.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>{'>'} {'<'}</span>
+                                                <p><b className="text-yellow-400">Limite-7 (±27.3¢):</b> Coma Septimal. Usada para atingir a Sétima Harmônica pura.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>4 5</span>
+                                                <p><b className="text-yellow-400">Limite-11 (±53.3¢):</b> Quarto de Tom Undecimal. Representa o 11º harmônico.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>9 0</span>
+                                                <p><b className="text-yellow-400">Limite-13 (±65.3¢):</b> Coma Tridecimal. Representa o 13º harmônico (Sexta Neutra).</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>; :</span>
+                                                <p><b className="text-yellow-400">Limite-17 (±10.1¢):</b> Ajuste fracional fino da 17ª harmônica.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>/ *</span>
+                                                <p><b className="text-yellow-400">Limite-19 (±14.2¢):</b> Desvio baseado na 19ª harmônica.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>6 3</span>
+                                                <p><b className="text-yellow-400">Limite-23 (±50.0¢):</b> Quarto de tom exato da série harmônica superior.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>7 2</span>
+                                                <p><b className="text-yellow-400">Limite-29 (±48.0¢):</b> Ajuste harmônico extremo.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>1 8</span>
+                                                <p><b className="text-yellow-400">Limite-31 (±45.0¢):</b> Correção matemática baseada no número primo 31.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>à á</span>
+                                                <p><b className="text-yellow-400">Limite-37 (±33.0¢):</b> Terço de tom natural.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>- +</span>
+                                                <p><b className="text-yellow-400">Limite-41 (±37.0¢):</b> Ajuste harmônico superior.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}>è é</span>
+                                                <p><b className="text-yellow-400">Limite-43 (±39.0¢):</b> Ajuste harmônico superior.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'HEJI2, serif', fontSize: '1.6rem', color: '#ffdd57', textAlign: 'center' }}> </span>
+                                                <p><b className="text-yellow-400">Limite-47 (±42.0¢):</b> O maior limite mapeado no sistema HEJI padrão.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* ========================================= */}
+                                    {/* GLOSSÁRIO SAGITTAL (SMuFL)                */}
+                                    {/* ========================================= */}
+                                    {notationSystem === 'sagittal' && (
+                                        <div className="space-y-4">
+                                            <p className="text-white border-b border-gray-800 pb-1 font-bold uppercase tracking-widest text-[10px]">Sagittal - Comas Principais</p>
+
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE3F8'} {'\uE3F9'}</span>
+                                                <p><b className="text-[#00ffcc]">Arco (Scroll):</b> ±21.5¢ (Limite-5 / Coma Sintónica). Corrige diatónicos para terças justas.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE3F2'} {'\uE3F3'}</span>
+                                                <p><b className="text-[#00ffcc]">Farpa (Barb):</b> ±27.3¢ (Limite-7 / Coma Septimal). Ajuste para a sétima harmônica.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE3F6'} {'\uE3F7'}</span>
+                                                <p><b className="text-[#00ffcc]">Arco + Farpa:</b> ±35.0¢ (Limite-13). Combinação matemática tridecimal.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE3F4'} {'\uE3F5'}</span>
+                                                <p><b className="text-[#00ffcc]">Farpa Dupla:</b> ±53.3¢ (Limite-11). Interpolação para o décimo-primeiro harmônico.</p>
+                                            </div>
+
+                                            <p className="text-white border-b border-gray-800 pb-1 mt-4 font-bold uppercase tracking-widest text-[10px]">Sagittal - Ajustes Finos (Minas e Tinas)</p>
+
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE302'} {'\uE303'}</span>
+                                                <p><b className="text-[#00ffcc]">1 Mina:</b> ±1.45¢. Micro-correção extrema.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE304'} {'\uE305'}</span>
+                                                <p><b className="text-[#00ffcc]">2 Minas:</b> ±2.9¢.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE306'} {'\uE307'}</span>
+                                                <p><b className="text-[#00ffcc]">1 Tina:</b> ±4.35¢.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE308'} {'\uE309'}</span>
+                                                <p><b className="text-[#00ffcc]">2 Tinas:</b> ±5.8¢.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE30A'} {'\uE30B'}</span>
+                                                <p><b className="text-[#00ffcc]">3 Tinas:</b> ±7.25¢.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE30C'} {'\uE30D'}</span>
+                                                <p><b className="text-[#00ffcc]">4 Tinas:</b> ±8.7¢.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE30E'} {'\uE30F'}</span>
+                                                <p><b className="text-[#00ffcc]">5 Tinas:</b> ±10.15¢.</p>
+                                            </div>
+                                            <div className="grid grid-cols-[45px_1fr] gap-2 items-center border-b border-gray-800 pb-2">
+                                                <span style={{ fontFamily: 'Bravura, serif', fontSize: '1.8rem', color: '#00ffcc', textAlign: 'center' }}>{'\uE310'} {'\uE311'}</span>
+                                                <p><b className="text-[#00ffcc]">Schisma (Curva Dupla):</b> ±11.6¢. Ajuste para a diferença entre limites de 17 e 19.</p>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {notationSystem === 'cents' && (
-                                        <>
-                                            <p className="text-white border-b border-gray-800 pb-1 mb-1 font-bold">Nota + Cents (Exato)</p>
-                                            <p className="mb-2">Mostra a nota no sistema tradicional (12-TET) acompanhada do desvio exato em Cents (1 cent = 1/100 de semitom).</p>
-                                            <p className="text-pink-500 font-bold mb-1">Como usar:</p>
-                                            <p>Ideal para exportar para DAWs, sintetizadores ou para músicos que usam afinadores digitais durante a performance.</p>
-                                        </>
+                                        <p>Avaliação quantitativa bruta (Cents). Registra o afastamento algébrico da afinação temperada.</p>
                                     )}
-
-                                    {(notationSystem === 'he' || notationSystem === 'ji' || notationSystem === 'auto') && (
-                                        <>
-                                            <p className="text-white border-b border-gray-800 pb-1 mb-1 font-bold">Helmholtz-Ellis (HEJI)</p>
-                                            <p className="mb-2">Notação oficial para Just Intonation (Afinação Justa). Usa "Comas" para corrigir a afinação temperada e criar acordes puros, sem batimentos.</p>
-
-                                            <p className="mt-2"><strong className="text-yellow-400 text-xs">↑ / ↓ (Seta Simples)</strong><br />
-                                                <span className="text-gray-400">Coma Sintónica (Limite-5) ≈ ±21.5¢</span><br />
-                                                Usada para corrigir as <b>Terças Maiores e Menores</b>. Abaixe a terça maior temperada em ~14c (usando o bemol com seta pra baixo) para obter a terça pura.</p>
-
-                                            <p className="mt-2"><strong className="text-yellow-400 text-xs">{'>'} / {'<'} (Gancho)</strong><br />
-                                                <span className="text-gray-400">Coma Septimal (Limite-7) ≈ ±27.3¢</span><br />
-                                                Usada para a <b>Sétima Harmônica</b>. O gancho rebaixa a nota para criar o clássico "acorde de dominante de blues" puro.</p>
-
-                                            <p className="mt-2"><strong className="text-yellow-400 text-xs">4 / 5 (Cruz)</strong><br />
-                                                <span className="text-gray-400">Quarto de tom de 11 ≈ ±53.3¢</span><br />
-                                                Usada para a <b>Quarta Aumentada natural</b> (o som da trompa alpina). Fica exatamente no meio entre a 4ª e 5ª Justas.</p>
-
-                                            <p className="mt-2"><strong className="text-yellow-400 text-xs">9 / 0 (Tridente)</strong><br />
-                                                <span className="text-gray-400">Coma Tridecimal (Limite-13) ≈ ±65.3¢</span><br />
-                                                Anota a "Sexta neutra", uma nota que soa ambígua, nem maior nem menor.</p>
-
-                                            <p className="mt-2"><strong className="text-yellow-400 text-xs">; / : (Ponto)</strong><br />
-                                                <span className="text-gray-400">Coma de 17 ≈ ±10.1¢</span><br />
-                                                Microajustes finíssimos para harmônicos agudos extremos.</p>
-                                        </>
-                                    )}
-
-                                    {notationSystem === 'sagittal' && (
-                                        <>
-                                            <p className="text-white border-b border-gray-800 pb-1 mb-1 font-bold">Sagittal (Athenian)</p>
-                                            <p className="mb-2">Um sistema universal que funciona como uma "bússola de harmônicos". A forma do símbolo indica qual harmônico da série natural você está a atingir.</p>
-
-                                            <p className="mt-2"><strong className="text-cyan-400 text-xs">Arco (Vela)</strong><br />
-                                                <span className="text-gray-400">Limite-5 ≈ ±21.5¢</span><br />
-                                                Altera a nota para criar <b>Terças</b> perfeitamente justas.</p>
-
-                                            <p className="mt-2"><strong className="text-cyan-400 text-xs">Farpa (Arpão 1 ponta)</strong><br />
-                                                <span className="text-gray-400">Limite-7 ≈ ±27.3¢</span><br />
-                                                Altera a nota para a <b>Sétima natural</b> (muito usada em coros Barbershop e Blues puro).</p>
-
-                                            <p className="mt-2"><strong className="text-cyan-400 text-xs">Farpa Dupla</strong><br />
-                                                <span className="text-gray-400">Limite-11 ≈ ±53.3¢</span><br />
-                                                Para intervalos undecimais (quartas aumentadas puras ou "meios-sustenidos" harmônicos).</p>
-
-                                            <p className="mt-2"><strong className="text-cyan-400 text-xs">Arco + Farpa</strong><br />
-                                                <span className="text-gray-400">Limite-13 ≈ ±35¢</span><br />
-                                                Combinação matemática para atingir o 13º harmônico (a clássica sexta menor rebaixada).</p>
-                                        </>
-                                    )}
-
                                     {notationSystem === 'quarter' && (
-                                        <>
-                                            <p className="text-white border-b border-gray-800 pb-1 mb-1 font-bold">Quartos e Sextos de Tom</p>
-                                            <p>Notação Stein-Zimmermann e Gould para temperamentos iguais exatos (24-EDO e 36-EDO).</p>
-                                        </>
+                                        <p>Notação paramétrica para 24-EDO (Divisões em ±50 cents).</p>
+                                    )}
+                                    {notationSystem === 'sixth' && (
+                                        <p>Sistema Gould adaptado para resolução em 36-EDO.</p>
                                     )}
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex-1 min-w-0 bg-gray-950 flex flex-col items-center justify-start relative">
-
                             {/* CABEÇALHO ANALÍTICO E ESCALA */}
                             <div className="absolute top-4 left-6 z-20 text-[10px] font-mono bg-gray-900 border border-gray-600 text-white px-3 py-1.5 rounded shadow-lg opacity-90">
                                 {activeTuning.type === 'edo'
@@ -2063,10 +2153,10 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
                                             {/* CLAVES TIPOGRÁFICAS (Bravura Oficial) */}
                                             {/* Clave de Sol (\uE050) posicionada no Y exato da linha G4 (-20) */}
-                                            <text x="35" y="-20" fontSize="42" fontFamily="HEJI2Bravura, serif" fill="#000">{'\uE050'}</text>
+                                            <text x="35" y="-20" fontSize="42" fontFamily="HEJI2Bravura, serif" fill="#000" dominantBaseline="central">{'\uE050'}</text>
 
                                             {/* Clave de Fá (\uE062) posicionada no Y exato da linha F3 (30) */}
-                                            <text x="35" y="30" fontSize="42" fontFamily="HEJI2Bravura, serif" fill="#000">{'\uE062'}</text>
+                                            <text x="35" y="30" fontSize="42" fontFamily="HEJI2Bravura, serif" fill="#000" dominantBaseline="central">{'\uE062'}</text>
 
                                             {/* CHAVE DE UNIÃO (Bracket) */}
                                             <line x1="30" y1="-50" x2="30" y2="60" stroke="#000" strokeWidth="3" />
@@ -2107,6 +2197,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                                                 fontFamily={note.font}
                                                                 fill="#000"
                                                                 textAnchor="start"
+                                                                dominantBaseline="central"
                                                             >
                                                                 {note.char}
                                                             </text>
@@ -2124,7 +2215,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                                             )}
                                                         </g>
 
-                                                        {/* TABELA DE SOFTWARE PITCH BENDS (Inalterada, continua perfeita) */}
+                                                        {/* TABELA DE SOFTWARE PITCH BENDS */}
                                                         {showPitchBends ? (
                                                             <g transform={`translate(${note.x}, ${TABLE_Y + 15})`}>
                                                                 <text x="0" y="0" fontSize="8" fill="#777" textAnchor="middle" fontFamily="sans-serif">nearest diatonic</text>

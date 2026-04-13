@@ -1,20 +1,31 @@
 import React from 'react';
 
-// === TABELA DE COMAS HEJI (Fonte HEJI2) ===
-// Mapeamento baseado nos caracteres que enviou e no padrão Sabat/Schweinitz
+// === TABELA DE COMAS HEJI (Fonte HEJI2) COMPLETA ===
 const HEJI_COMMAS = [
     { name: '47-up', cents: 42.0, char: '', limit: 47 },
     { name: '47-down', cents: -42.0, char: '', limit: 47 },
-    { name: '11-up', cents: 53.27, char: '4', limit: 11 },
-    { name: '11-down', cents: -53.27, char: '5', limit: 11 },
-    { name: '13-up', cents: 65.34, char: '9', limit: 13 },
-    { name: '13-down', cents: -65.34, char: '0', limit: 13 },
-    { name: '7-up', cents: 27.26, char: '>', limit: 7 },
-    { name: '7-down', cents: -27.26, char: '<', limit: 7 },
+    { name: '43-up', cents: 39.0, char: 'è', limit: 43 },
+    { name: '43-down', cents: -39.0, char: 'é', limit: 43 },
+    { name: '41-up', cents: 37.0, char: '-', limit: 41 },
+    { name: '41-down', cents: -37.0, char: '+', limit: 41 },
+    { name: '37-up', cents: 33.0, char: 'à', limit: 37 },
+    { name: '37-down', cents: -33.0, char: 'á', limit: 37 },
+    { name: '31-up', cents: 45.0, char: '1', limit: 31 },
+    { name: '31-down', cents: -45.0, char: '8', limit: 31 },
+    { name: '29-up', cents: 48.0, char: '7', limit: 29 },
+    { name: '29-down', cents: -48.0, char: '2', limit: 29 },
+    { name: '23-up', cents: 50.0, char: '6', limit: 23 },
+    { name: '23-down', cents: -50.0, char: '3', limit: 23 },
     { name: '19-up', cents: 14.22, char: '/', limit: 19 },
     { name: '19-down', cents: -14.22, char: '*', limit: 19 },
     { name: '17-up', cents: 10.06, char: ';', limit: 17 },
     { name: '17-down', cents: -10.06, char: ':', limit: 17 },
+    { name: '13-up', cents: 65.34, char: '9', limit: 13 },
+    { name: '13-down', cents: -65.34, char: '0', limit: 13 },
+    { name: '11-up', cents: 53.27, char: '4', limit: 11 },
+    { name: '11-down', cents: -53.27, char: '5', limit: 11 },
+    { name: '7-up', cents: 27.26, char: '>', limit: 7 },
+    { name: '7-down', cents: -27.26, char: '<', limit: 7 },
     { name: '5-up', cents: 21.51, char: 'f', limit: 5 }, // Sintónica
     { name: '5-down', cents: -21.51, char: 'd', limit: 5 }
 ];
@@ -61,31 +72,25 @@ export function generateNotationData(hzArray, baseHz, baseMidi, system) {
         // --- LÓGICA HEJI AVANÇADA (78+ combinações) ---
         if (system === 'he' || system === 'ji' || system === 'auto') {
             font = "HEJI2";
-            // Acidente base na fonte HEJI2: v=sharp, E=flat, e=natural
             let baseChar = (acc === 'sharp') ? 'v' : (acc === 'flat' ? 'E' : 'e');
 
-            // Busca a coma mais próxima na tabela
             let bestComma = HEJI_COMMAS.reduce((prev, curr) =>
                 Math.abs(curr.cents - centsDev) < Math.abs(prev.cents - centsDev) ? curr : prev
             );
 
-            // Se o erro for menor que 5 cents, aplica o modificador
             if (Math.abs(bestComma.cents - centsDev) < 15 && Math.abs(centsDev) > 3) {
-                // No HEJI2, alguns símbolos de 5-limit já estão fundidos (w, u, F, D, f, d)
                 if (bestComma.limit === 5) {
                     if (acc === 'sharp') char = (centsDev > 0) ? 'w' : 'u';
                     else if (acc === 'flat') char = (centsDev > 0) ? 'F' : 'D';
                     else char = (centsDev > 0) ? 'f' : 'd';
                 } else {
-                    // Para outros limites, concatena o acidente base com a tecla da coma
                     char = baseChar + bestComma.char;
                 }
             } else {
                 char = baseChar;
             }
-            yOffset = 11; // Correção vertical para a baseline da HEJI2
+            yOffset = 11;
         }
-
         // --- LÓGICA SAGITTAL ATENIENSE ---
         else if (system === 'sagittal') {
             font = "Bravura";
@@ -96,28 +101,61 @@ export function generateNotationData(hzArray, baseHz, baseMidi, system) {
             );
 
             if (absCents > 1.5) {
-                // Inverte o código unicode se for para baixo (SMuFL costuma ter pares adjacentes)
                 if (centsDev < 0) {
-                    // Lógica simples de espelhamento para os códigos core
                     if (bestSag.char === '\uE3F8') char = '\uE3F9';
                     else if (bestSag.char === '\uE3F2') char = '\uE3F3';
-                    else char = bestSag.char; // Simplificado para este exemplo
+                    else if (bestSag.char === '\uE3F6') char = '\uE3F7';
+                    else if (bestSag.char === '\uE3F4') char = '\uE3F5';
+                    else char = bestSag.char;
                 } else {
                     char = bestSag.char;
                 }
             } else {
-                char = '\uE261'; // Natural
+                char = '\uE261';
             }
             yOffset = 0;
         }
-
-        // --- QUARTOS E SEXTOS (BRAVURA) ---
-        else {
+        // --- NOTAÇÃO EXATA EM CENTS ---
+        else if (system === 'cents') {
             font = "Bravura";
-            if (system === 'quarter') {
-                if (acc === 'sharp') char = (centsDev < -20) ? '\uE282' : (centsDev > 20 ? '\uE283' : '\uE262');
-                else if (acc === 'flat') char = (centsDev > 20) ? '\uE280' : (centsDev < -20 ? '\uE281' : '\uE260');
-                else char = (centsDev > 20) ? '\uE282' : (centsDev < -20 ? '\uE280' : '\uE261');
+            if (acc === 'sharp') char = '\uE262';
+            else if (acc === 'flat') char = '\uE260';
+            else char = '\uE261';
+        }
+        // --- QUARTOS DE TOM (24-EDO) ---
+        else if (system === 'quarter') {
+            font = "Bravura";
+            xOffset = -25;
+            if (acc === 'sharp') {
+                if (centsDev < -20) char = '\uE282';
+                else if (centsDev > 20) char = '\uE283';
+                else char = '\uE262';
+            } else if (acc === 'flat') {
+                if (centsDev > 20) char = '\uE280';
+                else if (centsDev < -20) char = '\uE281';
+                else char = '\uE260';
+            } else {
+                if (centsDev > 20) char = '\uE282';
+                else if (centsDev < -20) char = '\uE280';
+                else char = '\uE261';
+            }
+        }
+        // --- SEXTOS DE TOM (36-EDO / Setas de Gould) ---
+        else if (system === 'sixth') {
+            font = "Bravura";
+            xOffset = -22;
+            if (acc === 'sharp') {
+                if (centsDev > 16) char = '\uE275';
+                else if (centsDev < -16) char = '\uE274';
+                else char = '\uE262';
+            } else if (acc === 'flat') {
+                if (centsDev > 16) char = '\uE271';
+                else if (centsDev < -16) char = '\uE270';
+                else char = '\uE260';
+            } else {
+                if (centsDev > 16) char = '\uE273';
+                else if (centsDev < -16) char = '\uE272';
+                else char = '\uE261';
             }
         }
 

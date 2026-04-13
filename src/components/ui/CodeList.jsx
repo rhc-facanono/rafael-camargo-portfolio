@@ -23,10 +23,14 @@ const codeData = [
         color: MARINHO,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></g>,
         contexto: {
-            pt: "Desenvolvimento baseado na 'Tonnetz' de Leonhard Euler e expandido espacialmente por Henri Pousseur. O objetivo histórico desta técnica é mapear a harmonia em eixos multidimensionais, permitindo transições calculadas entre polos tonais e material atonal/serial através da proximidade geométrica."
+            pt: "Mapeamento topológico de estruturas intervalares em eixos multidimensionais. Utilizado para análise de distâncias vetoriais entre classes de notas e modulação por proximidade geométrica em espaços temperados ou microtonais.",
+            en: "Topological mapping of interval structures across multidimensional axes. Used for vector distance analysis between pitch classes and modulation via geometric proximity in tempered or microtonal spaces.",
+            es: "Mapeo topológico de estructuras interválicas en ejes multidimensionales. Utilizado para el análisis de distancias vectoriales entre clases de notas y modulación por proximidad geométrica en espacios temperados o microtonales."
         },
         comoUsar: {
-            pt: "Defina os intervalos dos eixos X, Y e Z (em steps ou cents). Na visualização 3D, segure a tecla Ctrl e clique nos nós (esferas) para incluí-los na entidade gerada. Use o filtro para delimitar a área de visualização."
+            pt: "Defina as razões dos eixos X, Y e Z em passos ou cents. Na visualização 3D, utilize Ctrl+Clique nos nós para extrair os valores para a lista de saída. O filtro de raio delimita a renderização da malha.",
+            en: "Set the ratios for the X, Y, and Z axes in steps or cents. In the 3D viewport, use Ctrl+Click on nodes to extract values to the output array. The radius filter bounds the mesh rendering.",
+            es: "Defina las razones de los ejes X, Y y Z en pasos o cents. En la vista 3D, utilice Ctrl+Clic en los nodos para extraer los valores a la lista de salida. El filtro de radio delimita el renderizado de la malla."
         }
     },
     {
@@ -35,10 +39,14 @@ const codeData = [
         color: VINHO,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></g>,
         contexto: {
-            pt: "Técnica associada ao serialismo integral, notavelmente utilizada por Pierre Boulez. Consiste em uma operação de teoria de conjuntos onde uma estrutura intervalar matriz prolifera ao ser transposta sistematicamente sobre os pontos de uma segunda estrutura."
+            pt: "Operação da teoria dos conjuntos onde um vetor estrutural (Multiplicando) é transposto e somado sistematicamente a cada elemento de uma segunda estrutura (Multiplicador), gerando campos harmônicos derivados.",
+            en: "Set theory operation where a structural vector (Multiplicand) is systematically transposed and added to each element of a second structure (Multiplier), generating derived harmonic fields.",
+            es: "Operación de la teoría de conjuntos donde un vector estructural (Multiplicando) es transpuesto y sumado sistemáticamente a cada elemento de una segunda estructura (Multiplicador), generando campos armónicos derivados."
         },
         comoUsar: {
-            pt: "Insira as notas nas caixas A (Multiplicando) e B (Multiplicador). O sistema calcula a transposição do bloco A sobre cada nota do bloco B, retornando a fusão das notas sem duplicatas."
+            pt: "Insira los valores nas entradas A e B. O algoritmo processará a transposição do bloco A sobre as coordenadas de B, retornando a matriz resultante após a eliminação de redundâncias (classes duplicadas).",
+            en: "Input the values in arrays A and B. The algorithm will process the transposition of block A over the coordinates of B, returning the resulting matrix after eliminating redundancies (duplicate classes).",
+            es: "Ingrese los valores en las entradas A y B. El algoritmo procesará la transposición del bloque A sobre las coordenadas de B, devolviendo la matriz resultante tras eliminar redundancias (clases duplicadas)."
         }
     },
     {
@@ -47,10 +55,14 @@ const codeData = [
         color: LILAS,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.2 2.85" /></g>,
         contexto: {
-            pt: "Formalizado como iteração de campos pelo compositor Flo Menezes. A técnica baseia-se na repetição de uma célula intervalar contínua até que o somatório dos intervalos feche um ciclo de oitava exata."
+            pt: "Processo algorítmico que reitera uma célula intervalar geradora. A projeção contínua ocorre até que a somatória das frequências ou passos resulte em uma equivalência de oitava (1200 cents ou 2/1).",
+            en: "Algorithmic process that reiterates a generating interval cell. Continuous projection occurs until the sum of frequencies or steps results in an octave equivalence (1200 cents or 2/1).",
+            es: "Proceso algorítmico que reitera una célula interválica generadora. La proyección continua ocurre hasta que la suma de frecuencias o pasos resulte en una equivalencia de octava (1200 cents o 2/1)."
         },
         comoUsar: {
-            pt: "Forneça uma sequência de 2 ou mais notas. O módulo calcula a distância da primeira à última nota e projeta este intervalo recursivamente até que a estrutura retorne à tônica (oitava acima)."
+            pt: "Insira uma sequência numérica inicial. O algoritmo calcula o vetor primário e o transpõe recursivamente até alcançar a oitava de fechamento do ciclo geométrico.",
+            en: "Enter an initial numerical sequence. The algorithm calculates the primary vector and transposes it recursively until reaching the closing octave of the geometric cycle.",
+            es: "Introduzca una secuencia numérica inicial. El algoritmo calcula el vector primario y lo transpone recursivamente hasta alcanzar la octava de cierre del ciclo geométrico."
         }
     },
     {
@@ -59,10 +71,14 @@ const codeData = [
         color: MENTA,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></g>,
         contexto: {
-            pt: "Técnica desenvolvida pelo compositor Flo Menezes, alinhada aos conceitos do Espectralismo. Trata-se de um escalonamento logarítmico onde a 'gestalt' (proporção interna) de um acorde é mantida enquanto seu registro total é comprimido (concreção) ou expandido no espectro de frequências."
+            pt: "Técnica de processamento espectral onde o espectro interno (proporção relativa em cents) de uma coleção de frequências é mantido, enquanto seu escopo de registro é escalonado logaritmicamente (concreção ou expansão).",
+            en: "Spectral processing technique where the internal spectrum (relative proportion in cents) of a frequency collection is maintained, while its register scope is scaled logarithmically (concretion or expansion).",
+            es: "Técnica de procesamiento espectral donde el espectro interno (proporción relativa en cents) de una colección de frecuencias se mantiene, mientras su rango de registro se escala logarítmicamente (concreción o expansión)."
         },
         comoUsar: {
-            pt: "Insira o acorde original. Mova os controles deslizantes 'Min' e 'Max' para definir o limite inferior e superior (em Hertz). O algoritmo interpolará as notas originais matematicamente dentro do novo espaço."
+            pt: "Determine a coleção base. Ajuste os limites mínimo e máximo em Hertz. A função aplicará a interpolação matemática, reajustando os graus internos proporcionalmente dentro do novo espectro.",
+            en: "Determine the base collection. Adjust the minimum and maximum boundaries in Hertz. The function will apply mathematical interpolation, readjusting internal degrees proportionally within the new spectrum.",
+            es: "Determine la colección base. Ajuste los límites mínimo y máximo en Hercios. La función aplicará la interpolación matemática, reajustando los grados internos proporcionalmente dentro del nuevo espectro."
         }
     },
     {
@@ -71,10 +87,14 @@ const codeData = [
         color: AMARELO,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></g>,
         contexto: {
-            pt: "Base mecânica da Segunda Escola de Viena (Schoenberg, Webern). Opera a permutação completa de uma série através das formas Original, Retrógrado, Inversão e Retrógrado da Inversão. A expansão livre quebra a restrição histórica de 12 notas."
+            pt: "Cálculo combinatório que aplica as quatro simetrias básicas (Original, Retrógrado, Inversão, Retrógrado da Inversão) sobre um conjunto de classes de notas de cardinalidade N.",
+            en: "Combinatorial calculation applying the four basic symmetries (Prime, Retrograde, Inversion, Retrograde Inversion) over a set of pitch classes of cardinality N.",
+            es: "Cálculo combinatorio que aplica las cuatro simetrías básicas (Original, Retrógrado, Inversión, Retrógrado de la Inversión) sobre un conjunto de clases de notas de cardinalidad N."
         },
         comoUsar: {
-            pt: "Digite uma série de notas na entrada principal. A matriz cruzará os intervalos calculando todas as formas. Altere o menu de 'Visualização' para traduzir a tabela em classes de notas, Hz ou texto."
+            pt: "Insira a série base. O sistema calculará as inversões intervalares e gerará o quadro em formato de matriz quadrada. O formato de exibição (Hz, Cents ou Classes) pode ser alterado no menu.",
+            en: "Input the base series. The system will compute the interval inversions and generate the grid as a square matrix. The display format (Hz, Cents, or Classes) can be changed via the dropdown.",
+            es: "Introduzca la serie base. El sistema calculará las inversiones interválicas y generará el cuadro en formato de matriz cuadrada. El formato de visualización (Hz, Cents o Clases) se puede cambiar en el menú."
         }
     },
     {
@@ -83,10 +103,14 @@ const codeData = [
         color: SALMAO,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="12" r="6" /><circle cx="16" cy="12" r="6" /></g>,
         contexto: {
-            pt: "Processo de estúdio fundamental nos primórdios da música eletrônica (Karlheinz Stockhausen). Consiste na modulação de amplitude bipolar (multiplicação de sinais) que expele as frequências originais, restando apenas as frequências de soma (A+B) e diferença (|A-B|)."
+            pt: "Modulação de amplitude em anel que opera a supressão das frequências portadoras, processando o cálculo espectral das frequências de soma (F1 + F2) e de diferença (|F1 - F2|).",
+            en: "Ring amplitude modulation operating on the suppression of carrier frequencies, computing the spectral output of sum (F1 + F2) and difference (|F1 - F2|) frequencies.",
+            es: "Modulación de amplitud en anillo que opera la supresión de las frecuencias portadoras, calculando el espectro de las frecuencias de suma (F1 + F2) y diferencia (|F1 - F2|)."
         },
         comoUsar: {
-            pt: "Insira as portadoras. O parâmetro 'Cascata' define o nível de recursividade (aplicar o efeito sobre o resultado do efeito). Use 'Limite' para evitar travamento por excesso de cálculo de matrizes de frequências."
+            pt: "Defina as portadoras. O parâmetro 'Cascata' aplica recursividade, reinjetando a saída como entrada. Utilize o 'Limite' para truncar o cálculo da árvore harmônica e prevenir estouramento de pilha.",
+            en: "Set the carrier frequencies. The 'Cascade' parameter applies recursion, feeding the output back as input. Use the 'Limit' threshold to truncate the harmonic tree computation and prevent stack overflow.",
+            es: "Defina las frecuencias portadoras. El parámetro 'Cascada' aplica recursividad, inyectando la salida nuevamente como entrada. Use el 'Límite' para truncar el árbol armónico y evitar el desbordamiento de pila."
         }
     },
     {
@@ -95,10 +119,14 @@ const codeData = [
         color: CIANO,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12h4l2-9 5 18 3-9h6" /></g>,
         contexto: {
-            pt: "Descoberta por John Chowning. A Frequência Modulada altera o pitch de um oscilador portador através de um modulador em taxas de áudio. Fórmulas com razões não-inteiras produzem espectros inarmônicos ricos e densos, semelhantes a sinos."
+            pt: "Equação de modulação de frequência em taxa de áudio. A banda lateral de frequências geradas é governada pela relação Portadora/Moduladora (C:M) e pelo Índice de Modulação (K).",
+            en: "Audio-rate frequency modulation equation. The sideband frequencies generated are governed by the Carrier-to-Modulator ratio (C:M) and the Modulation Index (K).",
+            es: "Ecuación de modulación de frecuencia en tasa de audio. La banda lateral de frecuencias generadas está gobernada por la relación Portadora/Moduladora (C:M) y el Índice de Modulación (K)."
         },
         comoUsar: {
-            pt: "Defina os valores das caixas Portadora (C) e Moduladora (M). Aumente o botão giratório (Índice K) para expandir a amplitude da modulação, o que resulta matematicamente em mais harmônicos laterais (Sidebands)."
+            pt: "Especifique a frequência Portadora (C) e a Moduladora (M). O botão rotativo (Índice K) controla o desvio de frequência, ampliando o número de bandas laterais no espectro resultante.",
+            en: "Specify the Carrier (C) and Modulator (M) frequencies. The rotary knob (Index K) controls the frequency deviation, expanding the number of sidebands in the resulting spectrum.",
+            es: "Especifique la frecuencia Portadora (C) y Moduladora (M). La perilla rotativa (Índice K) controla la desviación de frecuencia, ampliando el número de bandas laterales en el espectro resultante."
         }
     },
     {
@@ -107,10 +135,14 @@ const codeData = [
         color: CINZA,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></g>,
         contexto: {
-            pt: "Derivada do Teorema de Fourier, atesta que espectros complexos são somatórias de senoides simples. Musicalmente, explora-se a projeção otonal (série harmônica via multiplicação inteira) e utonal (sub-harmônicos via divisão inteira)."
+            pt: "Algoritmo de geração parcial baseado na decomposição de Fourier. Extrapola fundamentais calculando parciais otonais (multiplicação escalar) e parciais utonais (divisão escalar).",
+            en: "Partial generation algorithm based on Fourier decomposition. Extrapolates fundamentals by computing otonal partials (scalar multiplication) and utonal partials (scalar division).",
+            es: "Algoritmo de generación parcial basado en la descomposición de Fourier. Extrapola fundamentales calculando parciales otonales (multiplicación escalar) y parciales utonales (división escalar)."
         },
         comoUsar: {
-            pt: "Forneça as notas fundamentais na caixa de texto. Ajuste os botões giratórios para determinar o limite de cálculo da série harmônica para cima (xN) e sub-harmônica para baixo (/N)."
+            pt: "Insira a(s) nota(s) geradora(s). Regule os índices de multiplicação harmônica e de divisão sub-harmônica. O algoritmo devolverá o espectro linear correspondente.",
+            en: "Input the generating note(s). Adjust the indices for harmonic multiplication and sub-harmonic division. The algorithm will return the corresponding linear spectrum.",
+            es: "Ingrese la(s) nota(s) generadora(s). Ajuste los índices de multiplicación armónica y división subarmónica. El algoritmo devolverá el espectro lineal correspondiente."
         }
     },
     {
@@ -119,22 +151,30 @@ const codeData = [
         color: OURO,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /><line x1="12" y1="2" x2="12" y2="4" /><line x1="12" y1="20" x2="12" y2="22" /><line x1="20" y1="12" x2="22" y2="12" /><line x1="2" y1="12" x2="4" y2="12" /></g>,
         contexto: {
-            pt: "Baseada na teoria de polarização acústica de Edmond Costère. Mede a atração gravitacional de um som em relação aos seus vizinhos no ciclo de quintas e semitons adjacentes, identificando os centros formânticos de um agregado."
+            pt: "Análise quantitativa baseada no sistema vetorial de Edmond Costère. A polarização acústica de um espectro é definida pela atração interválica a fatores de densidade de 5ªs perfeitas e 2ªs menores.",
+            en: "Quantitative analysis based on Edmond Costère's vectorial system. The acoustic polarization of a spectrum is defined by intervalic attraction to density factors of perfect 5ths and minor 2nds.",
+            es: "Análisis cuantitativo basado en el sistema vectorial de Edmond Costère. La polarización acústica de un espectro se define por la atracción interválica a los factores de densidad de 5as perfectas y 2as menores."
         },
         comoUsar: {
-            pt: "Insira as notas da coleção sob análise. A tabela 'Densidades Cardinais' avaliará o vetor. Valores altos indicam polaridade forte (para onde as notas da coleção tendem a resolver acusticamente)."
+            pt: "Forneça as notas do agregado. A tabela exibirá os índices de Densidade Cardinal. A nota com o valor numérico superior representa o centro de gravidade acústica da coleção.",
+            en: "Provide the notes of the aggregate. The table will display the Cardinal Density indices. The note with the highest numerical value represents the acoustic center of gravity of the collection.",
+            es: "Proporcione las notas del agregado. La tabla mostrará los índices de Densidad Cardinal. La nota con el valor numérico más alto representa el centro de gravedad acústica de la colección."
         }
     },
     {
         id: "tool-costere-interp", type: "tool", toolIndex: 10,
-        label: "Interpolação & Morphing",
+        label: "Interpolação Logarítmica",
         color: CORAL,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></g>,
         contexto: {
-            pt: "Algoritmos para transição de estados morfológicos. A via logarítmica executa um deslizamento matemático direto (glissando puro). A via de Costère executa saltos intervalares conduzidos pelas densidades de gravidade do alvo."
+            pt: "Cálculo de transição morfológica entre conjuntos de dados. O algoritmo logarítmico mapeia microtons através de deslizamento linear, alterando passo a passo as coordenadas da Coleção A para a Coleção B.",
+            en: "Morphological transition calculation between datasets. The logarithmic algorithm maps microtones via linear sliding, altering the coordinates of Collection A to Collection B step by step.",
+            es: "Cálculo de transición morfológica entre conjuntos de datos. El algoritmo logarítmico mapea microtonos mediante un deslizamiento lineal, alterando paso a paso las coordenadas de la Colección A a la Colección B."
         },
         comoUsar: {
-            pt: "Forneça as coleções de origem (A) e destino (B). Escolha a lógica do algoritmo (Acorde/Melodia e Log/Costère). Arraste o controle deslizante de Morphing para iterar sobre a progressão temporal calculada."
+            pt: "Introduza os conjuntos inicial (A) e alvo (B). O deslizador (Slider) percentual indexa os valores em tempo real, calculando a frequência interpolada na posição de corte indicada.",
+            en: "Enter the initial (A) and target (B) sets. The percentage slider indexes the values in real time, calculating the interpolated frequency at the specified cutoff position.",
+            es: "Introduzca los conjuntos inicial (A) y objetivo (B). El deslizador porcentual indexa los valores en tiempo real, calculando la frecuencia interpolada en la posición de corte indicada."
         }
     },
     {
@@ -143,34 +183,46 @@ const codeData = [
         color: NEON,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></g>,
         contexto: {
-            pt: "O módulo nuclear xenharmônico. Permite a reestruturação da física matemática de todos os cálculos do sistema (Hertz para Steps), viabilizando o uso de Divisões Iguais da Oitava (EDO) ou importação de arquivos Scala (.scl)."
+            pt: "Módulo central que define a constante de grade do sistema. Determina se as métricas obedecem à divisão igual da oitava (EDO) ou ao Just Intonation puro através de importação (.scl) ou inserção manual de razões.",
+            en: "Core module defining the system's grid constant. Determines whether metrics obey equal divisions of the octave (EDO) or pure Just Intonation via (.scl) import or manual ratio input.",
+            es: "Módulo central que define la constante de cuadrícula del sistema. Determina si las métricas obedecen a la división igual de la octava (EDO) o al Just Intonation puro mediante importación (.scl) o inserción de razones."
         },
         comoUsar: {
-            pt: "Selecione EDO, escreva rácios textuais (Custom) ou importe um arquivo .scl. Clique em 'Aplicar' para alterar o paradigma acústico do sistema. O painel abaixo lista as centésimas de semitom e as frações calculadas da escala."
+            pt: "Especifique o EDO ou as frações limitantes. Configure o ponto âncora (Frequência Hz atrelada a uma nota MIDI). Ao clicar em 'Aplicar', todos os motores de conversão e playback do sistema utilizarão este arquivo como base.",
+            en: "Specify the EDO or limiting fractions. Configure the anchor point (Hz frequency mapped to a MIDI note). By clicking 'Apply', all conversion and playback engines will use this file as the baseline.",
+            es: "Especifique el EDO o las fracciones limitantes. Configure el punto ancla (Frecuencia Hz vinculada a una nota MIDI). Al hacer clic en 'Aplicar', los motores de conversión utilizarán este archivo como base."
         }
     },
     {
         id: "tool-teclado", type: "tool", toolIndex: 13,
-        label: "Teclado Interativo",
+        label: "Interface MIDI/Áudio",
         color: NEON,
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" /><line x1="8" y1="5" x2="8" y2="15" /><line x1="16" y1="5" x2="16" y2="15" /><line x1="12" y1="5" x2="12" y2="15" /></g>,
         contexto: {
-            pt: "Interface de performance e monitoramento acústico. Provê feedback instantâneo da matriz temperada/não-temperada em andamento, processando entradas de dispositivos de hardware MIDI conectados ao navegador."
+            pt: "Módulo de monitoramento em tempo real. Interage com a Web MIDI API para ler eventos de Note On/Off e encaminhá-los ao sintetizador interno com o mapeamento microtonal em vigor.",
+            en: "Real-time monitoring module. Interacts with the Web MIDI API to read Note On/Off hardware events and route them to the internal synthesizer using the active microtonal mapping.",
+            es: "Módulo de monitorización en tiempo real. Interactúa con la Web MIDI API para leer eventos de Note On/Off y enrutarlos al sintetizador interno con el mapeo microtonal activo."
         },
         comoUsar: {
-            pt: "Ligue o seu teclado MIDI USB ou clique nas teclas do ecrã. O sintetizador interno reproduzirá a frequência microtonal exata processada de acordo com as regras ativas da Aba 11."
+            pt: "Acione as teclas do teclado na tela ou direcione o seu controlador MIDI físico para a aplicação. O oscilador reproduzirá as razões exatas ativas na Aba 11.",
+            en: "Trigger the on-screen keyboard keys or route your physical MIDI controller to the application. The oscillator will reproduce the exact ratios active in Tab 11.",
+            es: "Accione las teclas del teclado en pantalla o dirija su controlador MIDI físico a la aplicación. El oscilador reproducirá las razones exactas activas en la Pestaña 11."
         }
     },
     {
         id: "tool-notacao", type: "tool", toolIndex: 14,
         label: "Notação Microtonal",
-        color: "#ff99ff", // Um rosa choque/magenta para destacar
+        color: "#ff99ff",
         icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></g>,
         contexto: {
-            pt: "Sistemas de notação microtonal estendida. Helmholtz-Ellis (Sabat/Schweinitz) utiliza proporções de Just Intonation baseadas em comas (limites 5, 7, 11). O Sagittal é um sistema universal em rede focado tanto em razões puras quanto em divisões iguais (EDO)."
+            pt: "Algoritmo de conversão Hz-para-SVG baseado no padrão SMuFL. Converte desvios em cents para as tipografias Sagittal Athenian ou HEJI2 (Helmholtz-Ellis), aplicando o símbolo vetorial exato à altura diatônica.",
+            en: "Hz-to-SVG conversion algorithm based on the SMuFL standard. Converts cents deviation to Sagittal Athenian or HEJI2 (Helmholtz-Ellis) typography, applying the exact vector symbol to the diatonic pitch.",
+            es: "Algoritmo de conversión Hz-a-SVG basado en el estándar SMuFL. Convierte desviaciones en cents a las tipografías Sagittal Athenian o HEJI2, aplicando el símbolo vectorial exacto a la altura diatónica correspondiente."
         },
         comoUsar: {
-            pt: "Insira as frequências ou graus na caixa de texto. Escolha o sistema de acidentes. O algoritmo deduzirá a altura diatônica (linha do pentagrama) e anexará o símbolo vetorial (SVG) correspondente ao desvio em cents."
+            pt: "Insira as frequências de entrada. Selecione o padrão de notação desejado. A interface renderiza o pentagrama com os acidentes apropriados e permite a ativação de metadados Pitch Bend para DAW.",
+            en: "Input the array of frequencies. Select the desired notation standard. The interface renders the staff with appropriate accidentals and enables Pitch Bend metadata tracking for external DAWs.",
+            es: "Introduzca las frecuencias de entrada. Seleccione el estándar de notación deseado. La interfaz renderiza el pentagrama con las alteraciones apropiadas y permite el seguimiento de datos Pitch Bend para exportación."
         }
     }
 ];
@@ -182,47 +234,45 @@ function getCardStyles(color, isActive) {
     return { background: bg, color: textColor, border };
 }
 
-// O COMPONENTE MODAL COM O MANUAL TÉCNICO DE OPERAÇÃO
 function ManualModal({ onClose }) {
     return (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center", padding: "2rem" }}>
             <div style={{ background: "#111", width: "100%", maxWidth: "900px", height: "90%", borderRadius: "12px", border: "1px solid #444", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.8)" }}>
                 <div style={{ padding: "20px", borderBottom: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "#1a1a1a" }}>
-                    <h2 style={{ margin: 0, color: "#00ffcc", fontSize: "1.2rem", textTransform: "uppercase", letterSpacing: "2px" }}>Manual de Operação do Sistema</h2>
+                    <h2 style={{ margin: 0, color: "#00ffcc", fontSize: "1.2rem", textTransform: "uppercase", letterSpacing: "2px" }}>Manual Técnico de Operação</h2>
                     <button onClick={onClose} style={{ background: "#ff4757", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>Fechar Manual</button>
                 </div>
 
                 <div style={{ flex: 1, overflowY: "auto", padding: "40px", color: "#ddd", lineHeight: "1.8", fontSize: "14px" }} className="custom-scrollbar">
 
-                    <h3 style={{ color: "#fff", fontSize: "1.5rem", borderBottom: "1px solid #444", paddingBottom: "10px" }}>I. Controles Globais (Barra Superior)</h3>
+                    <h3 style={{ color: "#fff", fontSize: "1.2rem", borderBottom: "1px solid #444", paddingBottom: "10px" }}>I. Diretrizes Globais de Processamento</h3>
                     <ul style={{ background: "#222", padding: "20px 40px", borderRadius: "8px", marginTop: "15px", listStyleType: "circle" }}>
-                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#00ffcc" }}>Toggle Xenharmônico / 12-TET:</strong> Alterna o motor matemático de todo o software. Em 12-TET, o sistema limita-se às afinações de piano padrão. Em modo Xenharmônico, os cálculos respondem à afinação ativa estipulada na Aba 11.</li>
-                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#a8e4bc" }}>Quantizar (Snap Global):</strong> Um interruptor essencial para módulos que geram frequências quebradas (como Ring Modulation ou FM). Quando ativado (azul), o algoritmo fará uma varredura sobre as frequências geradas e irá forçá-las (snap) a assumir o degrau mais próximo da sua afinação atual.</li>
+                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#00ffcc" }}>Toggle Xenharmônico / 12-TET:</strong> Alterna a base de cálculo. Em 12-TET, o sistema opera na afinação temperada padrão. Em modo Xenharmônico, as variáveis dependem dos dados configurados no núcleo de Tuning (Aba 11).</li>
+                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#a8e4bc" }}>Quantizar (Snap Global):</strong> Sub-rotina analítica. Força as frequências geradas (em operações não-lineares como FM ou Interpolação) a efetuarem o arredondamento (snap) para o valor de tabela mais próximo na matriz de afinação ativa.</li>
                     </ul>
 
-                    <h3 style={{ color: "#fff", fontSize: "1.5rem", borderBottom: "1px solid #444", paddingBottom: "10px", marginTop: "40px" }}>II. Interação e Atalhos</h3>
+                    <h3 style={{ color: "#fff", fontSize: "1.2rem", borderBottom: "1px solid #444", paddingBottom: "10px", marginTop: "40px" }}>II. Operação e Entradas de Dados</h3>
                     <ul style={{ background: "#222", padding: "20px 40px", borderRadius: "8px", marginTop: "15px", listStyleType: "circle" }}>
-                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#ffdd57" }}>Inserção no Pentagrama:</strong> Para inserir notas visualmente nas pautas (SVG), você deve posicionar o mouse, <strong>segurar a tecla Ctrl (ou Cmd) e clicar</strong>. Isto evita inserções acidentais durante o scroll da página.</li>
-                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#ffdd57" }}>Uso de Acidentes Microtonais:</strong> Na barra do pentagrama, clique num acidente (ex: <code>d -50c</code>). Ele ficará sublinhado. Em seguida, use o `Ctrl + Clique` numa linha da pauta. A nota inserida carregará o desvio exato em Cents.</li>
-                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#ffdd57" }}>Atalho de Transposição (Alt + Setas):</strong> Clique numa caixa de texto de entrada para dar foco. Pressione <code>Alt + Seta Cima</code> ou <code>Alt + Seta Baixo</code> para transpor a última nota da lista matematicamente em 1 passo/semitom por clique.</li>
-                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#ffdd57" }}>Botões "Puxar de":</strong> Presentes no topo da maioria das abas, inserem a string de saída gerada noutra ferramenta diretamente na entrada da aba atual.</li>
-                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#ffdd57" }}>Knobs (Botões Giratórios):</strong> Posicione o ponteiro do mouse sobre o botão, clique e mantenha pressionado enquanto arrasta o mouse para cima ou para baixo para alterar os valores.</li>
+                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#ffdd57" }}>Atalho de Transposição:</strong> Ao selecionar uma caixa de entrada numérica, os atalhos de teclado <code>Alt + Seta Superior/Inferior</code> processam a transposição algorítmica da última entrada com base na escala em vigor.</li>
+                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#ffdd57" }}>Inserção Gráfica de Nodos (SVGs):</strong> Em módulos com interface de pentagrama vetorial, mantenha pressionado <code>Ctrl (Windows) ou Cmd (Mac)</code> + Clique esquerdo para inserir uma nota. Ações em acidentes flutuantes anexarão os desvios pré-selecionados.</li>
+                        <li style={{ marginBottom: "10px" }}><strong style={{ color: "#ffdd57" }}>Botões I/O ("Puxar de"):</strong> Transferem arrays de dados gerados na memória da sessão atual diretamente para o array de processamento do módulo ativo.</li>
                     </ul>
 
-                    <h3 style={{ color: "#fff", fontSize: "1.5rem", borderBottom: "1px solid #444", paddingBottom: "10px", marginTop: "40px" }}>III. Lógica Operacional por Seção</h3>
+                    <h3 style={{ color: "#fff", fontSize: "1.2rem", borderBottom: "1px solid #444", paddingBottom: "10px", marginTop: "40px" }}>III. Referência Analítica de Módulos</h3>
                     <div style={{ background: "#222", padding: "20px", borderRadius: "8px", marginTop: "15px" }}>
-                        <p><strong style={{ color: "#9fb1db" }}>Aba 1 (Redes):</strong> O dropdown centraliza o mapa (Padrão: C3). Os inputs (X, Y, Z) aceitam passos (se em 12-TET) ou Cents puros (se no modo microtonal). O botão "Cent. Câm" reseta o visualizador 3D.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#e4a8bc" }}>Aba 2 (Multiplicação):</strong> Calcula a transposição da Entidade A sobre cada nota da Entidade B. Em modo Xenharmônico, a transposição respeita a grade de afinação global.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#c0a8e4" }}>Aba 3 (Módulos):</strong> Repete a Entidade Base ciclicamente. Se o intervalo não fechar em 1200 cents imediatamente, a espiral continua até encontrar uma oitava harmônica perfeita.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#a8e4bc" }}>Aba 4 (Projeções):</strong> Redimensiona o acorde para caber entre as frequências Min e Max. Use a Quantização (Snap) para forçar o resultado quebrado para a escala musical.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#e4d9a8" }}>Aba 5 (Matriz):</strong> Gera a matriz dodecafônica (ou N-dimensional). Altere a visualização para analisar a série em Hz, Cents ou Classes de Notas.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#db9f9f" }}>Aba 6 (Ring Mod):</strong> Multiplica as portadoras. O Knob "Cascata" reinjeta o resultado no próprio modulador para espectros complexos. Use "Limite" para não travar o navegador.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#9fdbcf" }}>Aba 7 (Síntese FM):</strong> Portadora (C) é modulada por (M). Aumente o Índice K para gerar mais energia nas bandas laterais e enriquecer a inarmonicidade.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#b0b0b0" }}>Aba 8 (Aditiva):</strong> Projeta a série harmônica (para cima) e sub-harmônica (para baixo). Gire os botões para definir a quantidade de parciais desejada.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#ffdd57" }}>Aba 9 (Costère):</strong> Analisa a "Densidade Cardinal". Os números verdes no painel mostram os "polos de atração" para onde as notas inseridas querem resolver acusticamente.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#ff6b6b" }}>Aba 10 (Interpolação):</strong> O Slider inferior representa a passagem do tempo. No extremo esquerdo (0%), ouve-se a Entidade A. Ao deslizar para a direita, a matemática recalcula progressivamente as notas em direção à Entidade B.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#00ffcc" }}>Aba 11 (Afinações):</strong> O bloco "Tuning (Âncoras)" é a bússola do sistema. Ele indica qual tecla MIDI (ex: 60) representará uma frequência física estática (ex: 261.62Hz). Todas as notas geradas usarão essa âncora como marco zero para calcular o resto do teclado.</p>
-                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#00ffcc" }}>Aba 13 (Teclado):</strong> Um piano responsivo. Use o mouse ou o seu teclado controlador MIDI para ouvir o resultado exato das afinações microtonais processadas pelo motor do sistema.</p>
+                        <p><strong style={{ color: "#9fb1db" }}>Aba 1 (Redes 3D):</strong> Centralização vetorial (Z, Y, X). Entradas numéricas representam graus ou Cents. "Cent. Câm" executa o reset nas matrizes de rotação WebGL.</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#e4a8bc" }}>Aba 2 (Multiplicação):</strong> Calcula o produto vetorial sem duplicatas entre os graus das matrizes A e B.</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#c0a8e4" }}>Aba 3 (Módulos):</strong> Reiteração algorítmica de vetores intervalares limitados pela condição de equivalência da razão 2/1 (oitava).</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#a8e4bc" }}>Aba 4 (Projeções):</strong> Calcula a compressão ou expansão escalar de um agregado interválico dentro dos valores definidos nos limites paramétricos.</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#e4d9a8" }}>Aba 5 (Matriz):</strong> Processamento cruzado para elaboração dos espelhos P (Prime), R (Retrograde), I (Inversion) e RI. Saída flexível: classes, Hertz ou Cents absolutos.</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#db9f9f" }}>Aba 6 (Ring Mod):</strong> Multiplicação de espectros. Gera produtos paralelos resultantes das somatórias (f1+f2) e modulações absolutas (|f1-f2|).</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#9fdbcf" }}>Aba 7 (FM):</strong> Desvio da portadora pela taxa moduladora. O Índice K dita a amplitude das modulações das frequências laterais (Sidebands).</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#b0b0b0" }}>Aba 8 (Aditiva):</strong> Geração de série linear através da multiplicação inteira (Otonal) ou divisão (Utonal) da constante principal.</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#ffdd57" }}>Aba 9 (Costère):</strong> Rotina de cálculo de polarização e análise de gravidade através das quintas/semitons adjacentes (Densidade Cardinal).</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#ff6b6b" }}>Aba 10 (Interpolação):</strong> Algoritmo de morfologia sonora intermédia. O deslocador processa frações da distância entre as matrizes A e B no momento T.</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#00ffcc" }}>Aba 11 (Afinações):</strong> Core lógico. Substitui a fundação logarítmica para modelos customizados (.scl) ou limites primos, mapeando graus para offsets MIDI.</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#00ffcc" }}>Aba 13 (Teclado/MIDI):</strong> Motor Web Audio interligado a buffers de reprodução baseados na configuração da Aba 11.</p>
+                        <p style={{ marginTop: "10px" }}><strong style={{ color: "#ff99ff" }}>Aba 14 (Notação):</strong> Parse visual em SMuFL. Avalia o desvio espectral em cents de um array de frequências e o plota tipograficamente com os componentes HEJI ou Sagittal.</p>
                     </div>
 
                 </div>
@@ -276,14 +326,14 @@ export default function CodeList({ language = "pt" }) {
                         </div>
                     )}
 
-                    {/* EXPLICAÇÕES DESLOCADAS PARA BAIXO */}
+                    {/* EXPLICAÇÕES TÉCNICAS */}
                     <div style={{ width: "100%", background: "#222", borderRadius: 12, padding: 24, marginTop: 20, borderLeft: `4px solid ${selected.color}` }}>
                         <div style={{ marginBottom: 16 }}>
-                            <h3 style={{ color: selected.color, fontSize: 14, fontWeight: "bold", textTransform: "uppercase", marginBottom: 6 }}>Motivação & Teoria Estrutural</h3>
+                            <h3 style={{ color: selected.color, fontSize: 14, fontWeight: "bold", textTransform: "uppercase", marginBottom: 6 }}>Motivação Acústica e Estrutural</h3>
                             <p style={{ color: "#ccc", fontSize: 14, lineHeight: "1.6" }}>{selected.contexto[language]}</p>
                         </div>
                         <div>
-                            <h3 style={{ color: "#00ffcc", fontSize: 14, fontWeight: "bold", textTransform: "uppercase", marginBottom: 6 }}>Aplicação Técnica</h3>
+                            <h3 style={{ color: "#00ffcc", fontSize: 14, fontWeight: "bold", textTransform: "uppercase", marginBottom: 6 }}>Aplicação Lógica (I/O)</h3>
                             <p style={{ color: "#ccc", fontSize: 14, lineHeight: "1.6" }}>{selected.comoUsar[language]}</p>
                         </div>
                     </div>
