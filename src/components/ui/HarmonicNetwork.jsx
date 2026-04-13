@@ -314,6 +314,7 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         accidentalModifier, setAccidentalModifier, // Traz de volta os acidentes
         globalSnap, setGlobalSnap                  // Traz de volta o Snap Global
     } = useTuning();
+
     // ==========================================
     // MOTORES GLOBAIS COM ÂNCORAS DINÂMICAS E SNAP-TO-FREQ
     // ==========================================
@@ -1952,15 +1953,76 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                 </label>
                             </div>
 
+                            {/* GLOSSÁRIO DINÂMICO DE SÍMBOLOS (EXPANDIDO) */}
                             <div className="mt-auto pt-4 border-t border-gray-700">
-                                <div className="text-[10px] text-gray-400 mb-1">Dica de Notação:</div>
-                                <div className="bg-gray-950 p-2 rounded border border-gray-700 text-gray-300 font-mono text-[9px] shadow-inner leading-relaxed">
-                                    {notationSystem === 'cents' && "Mantém o acidente 12-TET normal e adiciona o desvio em cents. Universal."}
-                                    {notationSystem === 'ji' && "Modo Analítico. Mostra o símbolo HEJI e foca nos desvios exatos em Cents e Hz sobre a nota."}
-                                    {notationSystem === 'quarter' && "Aproximação 24-EDO. Utiliza meios-bemóis espelhados e sustenidos compostos (Gould)."}
-                                    {notationSystem === 'sixth' && "Aproximação 36-EDO. Setas nos acidentes clássicos para desvios de +/- 33.3c."}
-                                    {notationSystem === 'he' && "Helmholtz-Ellis. Setas para o limite-5 (Coma Sintónica)."}
-                                    {notationSystem === 'sagittal' && "Sagittal (Spartan). Flechas puras que mapeiam as vírgulas principais."}
+                                <h4 className="text-[10px] text-yellow-500 font-bold uppercase mb-2">Glossário Técnico & Prático:</h4>
+                                <div className="bg-gray-950 p-3 rounded border border-gray-700 text-gray-300 font-mono text-[10px] shadow-inner leading-relaxed overflow-y-auto max-h-[300px] custom-scrollbar">
+
+                                    {notationSystem === 'cents' && (
+                                        <>
+                                            <p className="text-white border-b border-gray-800 pb-1 mb-1 font-bold">Nota + Cents (Exato)</p>
+                                            <p className="mb-2">Mostra a nota no sistema tradicional (12-TET) acompanhada do desvio exato em Cents (1 cent = 1/100 de semitom).</p>
+                                            <p className="text-pink-500 font-bold mb-1">Como usar:</p>
+                                            <p>Ideal para exportar para DAWs, sintetizadores ou para músicos que usam afinadores digitais durante a performance.</p>
+                                        </>
+                                    )}
+
+                                    {(notationSystem === 'he' || notationSystem === 'ji' || notationSystem === 'auto') && (
+                                        <>
+                                            <p className="text-white border-b border-gray-800 pb-1 mb-1 font-bold">Helmholtz-Ellis (HEJI)</p>
+                                            <p className="mb-2">Notação oficial para Just Intonation (Afinação Justa). Usa "Comas" para corrigir a afinação temperada e criar acordes puros, sem batimentos.</p>
+
+                                            <p className="mt-2"><strong className="text-yellow-400 text-xs">↑ / ↓ (Seta Simples)</strong><br />
+                                                <span className="text-gray-400">Coma Sintónica (Limite-5) ≈ ±21.5¢</span><br />
+                                                Usada para corrigir as <b>Terças Maiores e Menores</b>. Abaixe a terça maior temperada em ~14c (usando o bemol com seta pra baixo) para obter a terça pura.</p>
+
+                                            <p className="mt-2"><strong className="text-yellow-400 text-xs">{'>'} / {'<'} (Gancho)</strong><br />
+                                                <span className="text-gray-400">Coma Septimal (Limite-7) ≈ ±27.3¢</span><br />
+                                                Usada para a <b>Sétima Harmônica</b>. O gancho rebaixa a nota para criar o clássico "acorde de dominante de blues" puro.</p>
+
+                                            <p className="mt-2"><strong className="text-yellow-400 text-xs">4 / 5 (Cruz)</strong><br />
+                                                <span className="text-gray-400">Quarto de tom de 11 ≈ ±53.3¢</span><br />
+                                                Usada para a <b>Quarta Aumentada natural</b> (o som da trompa alpina). Fica exatamente no meio entre a 4ª e 5ª Justas.</p>
+
+                                            <p className="mt-2"><strong className="text-yellow-400 text-xs">9 / 0 (Tridente)</strong><br />
+                                                <span className="text-gray-400">Coma Tridecimal (Limite-13) ≈ ±65.3¢</span><br />
+                                                Anota a "Sexta neutra", uma nota que soa ambígua, nem maior nem menor.</p>
+
+                                            <p className="mt-2"><strong className="text-yellow-400 text-xs">; / : (Ponto)</strong><br />
+                                                <span className="text-gray-400">Coma de 17 ≈ ±10.1¢</span><br />
+                                                Microajustes finíssimos para harmônicos agudos extremos.</p>
+                                        </>
+                                    )}
+
+                                    {notationSystem === 'sagittal' && (
+                                        <>
+                                            <p className="text-white border-b border-gray-800 pb-1 mb-1 font-bold">Sagittal (Athenian)</p>
+                                            <p className="mb-2">Um sistema universal que funciona como uma "bússola de harmônicos". A forma do símbolo indica qual harmônico da série natural você está a atingir.</p>
+
+                                            <p className="mt-2"><strong className="text-cyan-400 text-xs">Arco (Vela)</strong><br />
+                                                <span className="text-gray-400">Limite-5 ≈ ±21.5¢</span><br />
+                                                Altera a nota para criar <b>Terças</b> perfeitamente justas.</p>
+
+                                            <p className="mt-2"><strong className="text-cyan-400 text-xs">Farpa (Arpão 1 ponta)</strong><br />
+                                                <span className="text-gray-400">Limite-7 ≈ ±27.3¢</span><br />
+                                                Altera a nota para a <b>Sétima natural</b> (muito usada em coros Barbershop e Blues puro).</p>
+
+                                            <p className="mt-2"><strong className="text-cyan-400 text-xs">Farpa Dupla</strong><br />
+                                                <span className="text-gray-400">Limite-11 ≈ ±53.3¢</span><br />
+                                                Para intervalos undecimais (quartas aumentadas puras ou "meios-sustenidos" harmônicos).</p>
+
+                                            <p className="mt-2"><strong className="text-cyan-400 text-xs">Arco + Farpa</strong><br />
+                                                <span className="text-gray-400">Limite-13 ≈ ±35¢</span><br />
+                                                Combinação matemática para atingir o 13º harmônico (a clássica sexta menor rebaixada).</p>
+                                        </>
+                                    )}
+
+                                    {notationSystem === 'quarter' && (
+                                        <>
+                                            <p className="text-white border-b border-gray-800 pb-1 mb-1 font-bold">Quartos e Sextos de Tom</p>
+                                            <p>Notação Stein-Zimmermann e Gould para temperamentos iguais exatos (24-EDO e 36-EDO).</p>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
