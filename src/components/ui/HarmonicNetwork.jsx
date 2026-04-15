@@ -336,7 +336,6 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         14: { title: "Editor de Notação Profissional", text: "Traduz toda a matemática em partituras reais. \n\nCOMO USAR:\nCole as frequências ou as puxe das abas. Escolha entre HEJI (para Acordes Puros), Sagittal (Notação Avançada) ou Cents para exportar para o seu DAW (Sibelius/Dorico)." }
     };
 
-    // RENDERIZADOR DO MODAL DE AJUDA
     const renderHelpModal = () => {
         if (!activeHelpModal) return null;
         const helpData = helpDictionary[activeHelpModal];
@@ -587,7 +586,180 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
     const [tab14Input, setTab14Input] = useState("");
     const [notationSystem, setNotationSystem] = useState("cents");
     const [sagittalLevel, setSagittalLevel] = useState("spartan");
-    const [showPitchBends, setShowPitchBends] = useState(false); // NOVO: Toggle Pitch Bends
+    const [showPitchBends, setShowPitchBends] = useState(false);
+
+    // ==========================================
+    // ESTADOS: ABA 15 & 16 (SEQUENCIADOR E COMPARADOR)
+    // ==========================================
+    const [tab15Chords, setTab15Chords] = useState([
+        { id: 1, notes: "60, 64, 67", tuning: "12-TET", anchorMidi: 60, anchorHz: 261.63, isExpanded: true, customTuningObj: null },
+        { id: 2, notes: "60, 64, 67", tuning: "19-EDO", anchorMidi: 60, anchorHz: 261.63, isExpanded: true, customTuningObj: null },
+        { id: 3, notes: "62, 65, 69", tuning: "JI (Limite-5)", anchorMidi: 60, anchorHz: 261.63, isExpanded: true, customTuningObj: null }
+    ]);
+    const [activeChordIndex, setActiveChordIndex] = useState(0);
+    const [tab15AvailableTunings, setTab15AvailableTunings] = useState(["12-TET", "11-EDO", "19-EDO", "31-EDO", "53-EDO", "JI (Limite-5)", "GLOBAL"]);
+    const [tab15NewTuningInput, setTab15NewTuningInput] = useState("");
+
+    const [tab16Scales, setTab16Scales] = useState([
+        { id: 1, name: "12-TET", type: "edo", value: 12 },
+        { id: 2, name: "19-EDO", type: "edo", value: 19 },
+        { id: 3, name: "31-EDO", type: "edo", value: 31 }
+    ]);
+    const [tab16NewScaleEdo, setTab16NewScaleEdo] = useState(22);
+    const [tab16HoveredCents, setTab16HoveredCents] = useState(null);
+    const [tab16SelectedNode, setTab16SelectedNode] = useState(null);
+    const [tab16AnchorMidi, setTab16AnchorMidi] = useState(60);
+    const [tab16AnchorHz, setTab16AnchorHz] = useState(261.63);
+
+    // MOTOR MATEMÁTICO: PROXIMIDADE (Atualizado para suportar Custom Scales .scl)
+    const jiOctaveMap = { 0: 0.0, 100: 111.73, 200: 203.91, 300: 315.64, 400: 386.31, 500: 498.04, 600: 582.51, 700: 701.96, 800: 813.69, 900: 884.36, 1000: 1017.60, 1100: 1088.27 };
+
+    const getClosestMicrotonalHz = (targetHz, tuningType, anchorHz, customTuningObj = null) => {
+        const targetCents = 1200 * Math.log2(targetHz / anchorHz);
+        let closestCents = 0;
+
+        if (customTuningObj) {
+            if (customTuningObj.type === 'edo') {
+                const stepCents = 1200 / customTuningObj.divisions;
+                closestCents = Math.round(targetCents / stepCents) * stepCents;
+            } else if (customTuningObj.type === 'scala' && customTuningObj.data) {
+                const scale = customTuningObj.data.scale;
+                const period = scale[scale.length - 1].cents || 1200;
+                const octaves = Math.floor(targetCents / period);
+                const remainder = targetCents - (octaves * period);
+                let minDiff = Math.abs(remainder);
+                let matchedCents = 0;
+                scale.forEach(s => {
+                    const diff = Math.abs(remainder - s.cents);
+                    if (diff < minDiff) { minDiff = diff; matchedCents = s.cents; }
+                });
+                closestCents = (octaves * period) + matchedCents;
+            }
+        } else if (tuningType === '12-TET') {
+            closestCents = Math.round(targetCents / 100) * 100;
+        } else if (tuningType.includes('-EDO')) {
+            const edo = parseInt(tuningType);
+            const stepCents = 1200 / edo;
+            closestCents = Math.round(targetCents / stepCents) * stepCents;
+        } else if (tuningType === 'JI (Limite-5)') {
+            let semi = Math.round(targetCents / 100) * 100;
+            let octaves = Math.floor(semi / 1200);
+            let rem = semi % 1200;
+            if (rem < 0) rem += 1200;
+            closestCents = (octaves * 1200) + (jiOctaveMap[rem] !== undefined ? jiOctaveMap[rem] : rem);
+        } else if (tuningType === 'GLOBAL') {
+            return midiToHz(hzToMidi(targetHz));
+        } else {
+            closestCents = Math.round(targetCents / 100) * 100;
+        }
+        return anchorHz * Math.pow(2, closestCents / 1200);
+    };
+
+    const playMorphTransition = (idx) => {
+        if (idx >= tab15Chords.length - 1) return; // Não há próximo acorde
+        stopAudio();
+        currentAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const masterGain = currentAudioCtx.createGain();
+        masterGain.gain.value = 0.15;
+        masterGain.connect(currentAudioCtx.destination);
+
+        const chord1 = tab15Chords[idx];
+        const chord2 = tab15Chords[idx + 1];
+        const rawMidi1 = chord1.notes.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+        const rawMidi2 = chord2.notes.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+        const hzArr1 = rawMidi1.map(m => getClosestMicrotonalHz(440 * Math.pow(2, (m - 69) / 12), chord1.tuning, chord1.anchorHz));
+        const hzArr2 = rawMidi2.map(m => getClosestMicrotonalHz(440 * Math.pow(2, (m - 69) / 12), chord2.tuning, chord2.anchorHz));
+
+        const now = currentAudioCtx.currentTime;
+        const DUR = 3.5, STABLE = 1.0, GLIDE = 1.5;
+        const maxV = Math.max(hzArr1.length, hzArr2.length);
+
+        for (let v = 0; v < maxV; v++) {
+            const osc = currentAudioCtx.createOscillator();
+            const gain = currentAudioCtx.createGain();
+            osc.type = v === 0 ? 'triangle' : 'sine';
+
+            const f1 = v < hzArr1.length ? hzArr1[v] : hzArr1[hzArr1.length - 1] || 440;
+            const v1 = v < hzArr1.length ? 1 : 0;
+            const f2 = v < hzArr2.length ? hzArr2[v] : hzArr2[hzArr2.length - 1] || 440;
+            const v2 = v < hz2.length ? 1 : 0;
+
+            osc.frequency.setValueAtTime(f1, now);
+            osc.frequency.setValueAtTime(f1, now + STABLE);
+            osc.frequency.exponentialRampToValueAtTime(f2, now + STABLE + GLIDE);
+
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(v1, now + 0.1);
+            gain.gain.setValueAtTime(v1, now + STABLE);
+            gain.gain.linearRampToValueAtTime(v2, now + STABLE + GLIDE);
+            gain.gain.setValueAtTime(v2, now + DUR - 0.5);
+            gain.gain.linearRampToValueAtTime(0, now + DUR);
+
+            osc.connect(gain); gain.connect(masterGain);
+            osc.start(now); osc.stop(now + DUR + 0.5);
+            activeOscillators.push(osc);
+        }
+    };
+
+
+    // MOTOR DE MORPHING WEB AUDIO (Do codacord.txt)
+    const playMorphingSequence = () => {
+        stopAudio();
+        if (!tab15Chords.length) return;
+        currentAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const masterGain = currentAudioCtx.createGain();
+        masterGain.gain.value = 0.15;
+        masterGain.connect(currentAudioCtx.destination);
+        const now = currentAudioCtx.currentTime;
+        const DUR = 3.5; // Tempo por acorde
+
+        const maxVoices = Math.max(...tab15Chords.map(c => c.notes.split(',').filter(Boolean).length));
+
+        for (let v = 0; v < maxVoices; v++) {
+            const osc = currentAudioCtx.createOscillator();
+            const gain = currentAudioCtx.createGain();
+            osc.type = v === 0 ? 'triangle' : 'sine';
+
+            for (let i = 0; i < tab15Chords.length; i++) {
+                const chord = tab15Chords[i];
+                const rawMidi = chord.notes.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+                const hzArr = rawMidi.map(m => getClosestMicrotonalHz(440 * Math.pow(2, (m - 69) / 12), chord.tuning, chord.anchorHz));
+
+                const start = now + (i * DUR);
+                const glide = start + 1.5; // Fica estável por 1.5s, desliza no resto
+
+                const hasVoice = v < hzArr.length;
+                const freq = hasVoice ? hzArr[v] : hzArr[hzArr.length - 1];
+                const vol = hasVoice ? 1 : 0;
+
+                if (i === 0) {
+                    osc.frequency.setValueAtTime(freq, now);
+                    gain.gain.setValueAtTime(0, now);
+                    gain.gain.linearRampToValueAtTime(vol, now + 0.1);
+                } else {
+                    const prevChord = tab15Chords[i - 1];
+                    const prevMidi = prevChord.notes.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+                    const prevHzArr = prevMidi.map(m => getClosestMicrotonalHz(440 * Math.pow(2, (m - 69) / 12), prevChord.tuning, prevChord.anchorHz));
+                    const prevHasVoice = v < prevHzArr.length;
+                    const prevFreq = prevHasVoice ? prevHzArr[v] : prevHzArr[prevHzArr.length - 1];
+                    const prevVol = prevHasVoice ? 1 : 0;
+
+                    osc.frequency.setValueAtTime(prevFreq, glide);
+                    osc.frequency.exponentialRampToValueAtTime(freq, start + DUR);
+                    gain.gain.setValueAtTime(prevVol, glide);
+                    gain.gain.linearRampToValueAtTime(vol, start + DUR);
+                }
+            }
+
+            const endTime = now + (tab15Chords.length * DUR);
+            gain.gain.setValueAtTime(v < tab15Chords[tab15Chords.length - 1].notes.split(',').filter(Boolean).length ? 1 : 0, endTime - 0.5);
+            gain.gain.linearRampToValueAtTime(0, endTime);
+
+            osc.connect(gain); gain.connect(masterGain);
+            osc.start(now); osc.stop(endTime + 0.5);
+            activeOscillators.push(osc);
+        }
+    };
 
     // MOTORES (MEMOIZED)
     const points = useMemo(() => {
@@ -1112,6 +1284,68 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             <button onClick={() => onPull(arrToStr(tab4ResultHz))} className="text-[9px] bg-gray-700 hover:bg-gray-600 px-1.5 py-0.5 rounded transition">Proj</button>
         </div>
     );
+    // ==========================================
+    // MOTOR DE ÁUDIO: MORPHING (ABA 15)
+    // ==========================================
+    const morphAudioCtxRef = useRef(null);
+    const morphMasterGainRef = useRef(null);
+    const morphActiveNodesRef = useRef([]);
+    const morphTimeoutsRef = useRef([]);
+
+    const initMorphAudio = () => {
+        if (!morphAudioCtxRef.current) {
+            morphAudioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            morphMasterGainRef.current = morphAudioCtxRef.current.createGain();
+            morphMasterGainRef.current.gain.value = 0.1; // Volume mestre
+            const comp = morphAudioCtxRef.current.createDynamicsCompressor();
+            comp.threshold.value = -24;
+            comp.ratio.value = 4;
+            morphMasterGainRef.current.connect(comp);
+            comp.connect(morphAudioCtxRef.current.destination);
+        }
+        if (morphAudioCtxRef.current.state === 'suspended') morphAudioCtxRef.current.resume();
+    };
+
+    const stopMorphAudio = () => {
+        morphTimeoutsRef.current.forEach(clearTimeout);
+        morphTimeoutsRef.current = [];
+        morphActiveNodesRef.current.forEach(n => {
+            try {
+                n.g.gain.cancelScheduledValues(morphAudioCtxRef.current.currentTime);
+                n.g.gain.setTargetAtTime(0, morphAudioCtxRef.current.currentTime, 0.1);
+                setTimeout(() => { try { n.o.stop(); } catch (e) { } }, 500);
+            } catch (e) { }
+        });
+        morphActiveNodesRef.current = [];
+    };
+
+    const playSingleChordMorph = (chord) => {
+        stopMorphAudio();
+        initMorphAudio();
+        const ctx = morphAudioCtxRef.current;
+        const now = ctx.currentTime;
+        const DUR = 3;
+
+        const hzArray = parseAdvancedToHz(chord.notes).map(h => getClosestInScale(h, chord.tuning, 0, chord.anchorHz, chord.anchorMidi));
+
+        hzArray.forEach((hz, v) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = v === 0 ? 'triangle' : 'sine';
+            o.frequency.value = hz;
+
+            g.gain.setValueAtTime(0, now);
+            g.gain.linearRampToValueAtTime(1, now + 0.1);
+            g.gain.setValueAtTime(1, now + DUR - 0.5);
+            g.gain.linearRampToValueAtTime(0, now + DUR);
+
+            o.connect(g);
+            g.connect(morphMasterGainRef.current);
+            o.start(now);
+            o.stop(now + DUR + 0.1);
+            morphActiveNodesRef.current.push({ o, g });
+        });
+    };
 
     return (
         <div className="w-full h-full relative flex flex-col bg-gray-950 font-sans text-white">
@@ -2243,6 +2477,378 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     </div>
                                 );
                             })()}
+                        </div>
+                    </div>
+                )}
+
+                {/* ========================================= */}
+                {/* ABA 15: SEQUENCIADOR (INTERFACE DO TXT)   */}
+                {/* ========================================= */}
+                {activeTool === 15 && (
+                    <div className="flex w-full h-full bg-[#0d1117] overflow-hidden">
+
+                        <div className="w-[420px] flex-shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col h-full z-20 shadow-xl">
+                            <div className="p-4 border-b border-slate-700 bg-slate-950 flex flex-col gap-3">
+                                <h2 className="text-xl font-bold text-white">Voice Leading Dinâmico</h2>
+                                <div className="flex gap-2 mt-1">
+                                    <button onClick={() => setTab15Chords([...tab15Chords, { id: Date.now(), notes: "60, 64, 67", tuning: "12-TET", anchorMidi: 60, anchorHz: 261.63, isExpanded: true, customTuningObj: null }])} className="flex-1 bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold py-2 rounded transition border border-slate-600">
+                                        + Novo Acorde
+                                    </button>
+                                    <button onClick={playMorphingSequence} className="flex-1 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold py-2 rounded transition shadow-lg shadow-violet-500/30">
+                                        ▶ Morph Todos
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
+                                {tab15Chords.map((chord, index) => {
+                                    const rawMidis = chord.notes.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+                                    return (
+                                        <div
+                                            key={chord.id} onClick={() => setActiveChordIndex(index)}
+                                            className={`p-4 rounded-xl transition-all cursor-pointer relative group flex flex-col gap-3
+                                                ${activeChordIndex === index ? 'border-2 border-violet-500 bg-violet-900/10 shadow-[0_5px_15px_rgba(139,92,246,0.2)]' : 'border-2 border-transparent bg-slate-800 hover:bg-slate-700'}`}
+                                        >
+                                            <button onClick={(e) => { e.stopPropagation(); setTab15Chords(tab15Chords.filter(c => c.id !== chord.id)); setActiveChordIndex(Math.max(0, index - 1)); }} className="absolute top-2 right-2 text-slate-500 hover:text-red-500 opacity-0 group-hover:opacity-100 font-bold transition">✕</button>
+
+                                            <div className="flex justify-between items-center border-b border-slate-700 pb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={(e) => { e.stopPropagation(); const n = [...tab15Chords]; n[index].isExpanded = !n[index].isExpanded; setTab15Chords(n); }} className="text-[#00ffcc] font-bold w-5 h-5 flex items-center justify-center bg-slate-950 rounded hover:bg-slate-700">
+                                                        {chord.isExpanded ? '▼' : '▶'}
+                                                    </button>
+                                                    <h3 className="text-lg font-bold text-white">Acorde #{index + 1}</h3>
+                                                </div>
+                                                <select
+                                                    value={chord.customTuningObj ? "CUSTOM" : chord.tuning}
+                                                    onChange={e => { const n = [...tab15Chords]; n[index].tuning = e.target.value; n[index].customTuningObj = null; setTab15Chords(n); }}
+                                                    className="bg-slate-950 text-white text-xs p-1.5 rounded border border-slate-600 outline-none font-bold cursor-pointer max-w-[130px]"
+                                                >
+                                                    {chord.customTuningObj && <option value="CUSTOM">[{chord.customTuningObj.data?.description?.substring(0, 8) || "SCL"}]</option>}
+                                                    {tab15AvailableTunings.map(t => <option key={t} value={t}>{t}</option>)}
+                                                </select>
+                                            </div>
+
+                                            {chord.isExpanded && (
+                                                <>
+                                                    <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2 rounded border border-slate-700">
+                                                        <div>
+                                                            <label className="text-[9px] text-slate-500 uppercase block mb-1">Âncora (MIDI):</label>
+                                                            <input
+                                                                type="number" value={chord.anchorMidi}
+                                                                onChange={e => {
+                                                                    const n = [...tab15Chords];
+                                                                    const novoMidi = Number(e.target.value);
+                                                                    n[index].anchorMidi = novoMidi;
+                                                                    n[index].anchorHz = Number((440 * Math.pow(2, (novoMidi - 69) / 12)).toFixed(2));
+                                                                    setTab15Chords(n);
+                                                                }}
+                                                                className="w-full bg-slate-800 text-slate-300 text-xs p-1 rounded border border-slate-600 text-center"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[9px] text-slate-500 uppercase block mb-1">Âncora (Hz):</label>
+                                                            <input
+                                                                type="number" step="any" value={chord.anchorHz}
+                                                                onChange={e => { const n = [...tab15Chords]; n[index].anchorHz = Number(e.target.value); setTab15Chords(n); }}
+                                                                className="w-full bg-slate-800 text-slate-300 text-xs p-1 rounded border border-slate-600 text-center"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <button onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const n = [...tab15Chords];
+                                                        n[index].customTuningObj = activeTuning;
+                                                        setTab15Chords(n);
+                                                    }} className="w-full bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-400 text-[10px] font-bold py-1.5 rounded border border-emerald-800 transition">
+                                                        ↓ Snapshot da Aba 11 (.scl)
+                                                    </button>
+
+                                                    <div className="flex flex-col gap-1">
+                                                        {rawMidis.map((m, vIdx) => {
+                                                            const baseHz = 440 * Math.pow(2, (m - 69) / 12);
+                                                            const mappedHz = getClosestMicrotonalHz(baseHz, chord.tuning, chord.anchorHz, chord.customTuningObj);
+                                                            const deviation = 1200 * Math.log2(mappedHz / baseHz);
+                                                            const sign = deviation > 0.05 ? '+' : '';
+                                                            let colorClass = Math.abs(deviation) <= 0.05 ? 'text-[#34d399]' : (deviation > 0.05 ? 'text-[#f87171]' : 'text-[#60a5fa]');
+                                                            let devStr = Math.abs(deviation) <= 0.05 ? '0c' : `${sign}${deviation.toFixed(1)}c`;
+                                                            const noteName = noteNames[((Math.round(m) % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+
+                                                            return (
+                                                                <div key={vIdx} className="font-mono text-[11px] p-1.5 rounded bg-[#1e293b] flex justify-between items-center shadow-inner border border-slate-700/50">
+                                                                    <span className="font-bold text-slate-300 w-8">{noteName}</span>
+                                                                    <span className={`${colorClass} font-bold flex-1 text-center`}>{devStr}</span>
+                                                                    <span className="text-slate-400 w-14 text-right">{mappedHz.toFixed(1)}Hz</span>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const newChords = [...tab15Chords];
+                                                                            let notesArr = chord.notes.split(',').map(s => s.trim()).filter(Boolean);
+                                                                            notesArr.splice(vIdx, 1);
+                                                                            newChords[index].notes = notesArr.join(', ');
+                                                                            setTab15Chords(newChords);
+                                                                        }}
+                                                                        className="ml-2 text-slate-500 hover:text-red-500 font-bold transition flex items-center justify-center w-4"
+                                                                        title="Remover Nota"
+                                                                    >✕</button>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    <div className="flex gap-2 mt-1">
+                                                        <button onClick={(e) => { e.stopPropagation(); playAudio(rawMidis.map(m => getClosestMicrotonalHz(440 * Math.pow(2, (m - 69) / 12), chord.tuning, chord.anchorHz, chord.customTuningObj)), true); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold py-2 rounded transition">
+                                                            ▶ Ouvir
+                                                        </button>
+                                                        {index < tab15Chords.length - 1 && (
+                                                            <button onClick={(e) => { e.stopPropagation(); playMorphTransition(index); }} className="flex-1 bg-violet-700 hover:bg-violet-600 text-white text-[10px] font-bold py-2 rounded transition shadow-lg">
+                                                                ⤨ Morph
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* PAINEL DIREITO: Pauta SVG Interativa com Scroll Horizontal Nativo */}
+                        <div className="flex-1 bg-[#fdfdfd] relative flex flex-col h-full overflow-hidden">
+                            <div className="p-3 bg-slate-900 border-b border-slate-700 flex justify-between items-center shadow-md z-10">
+                                <span className="text-[#00ffcc] text-xs font-mono font-bold bg-slate-950 px-3 py-1.5 rounded border border-[#00ffcc]/30">
+                                    Editando: Acorde #{activeChordIndex + 1}
+                                </span>
+                                <span className="text-slate-400 text-[10px]">A pauta rola horizontalmente. Clique para adicionar/remover.</span>
+                            </div>
+
+                            {/* O container usa 'block' (sem flex items-center) para garantir que o scroll inicie na esquerda corretamente */}
+                            <div className="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar bg-gray-50 pt-8 pl-4">
+                                {(() => {
+                                    const activeChord = tab15Chords[activeChordIndex];
+                                    if (!activeChord) return null;
+
+                                    const rawMidis = activeChord.notes.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+                                    const microtonalHzArray = rawMidis.map(m => getClosestMicrotonalHz(440 * Math.pow(2, (m - 69) / 12), activeChord.tuning, activeChord.anchorHz, activeChord.customTuningObj));
+
+                                    // Gera as notas originais
+                                    let notesData = generateNotationData(microtonalHzArray, baseHz, baseMidi, notationSystem);
+
+                                    // A MÁGICA DO ESPAÇAMENTO: Comprime o eixo X para as notas ficarem mais juntas (50px em vez de 90px)
+                                    notesData = notesData.map((n, i) => ({ ...n, x: 100 + (i * 50) }));
+
+                                    const TABLE_Y = 60;
+                                    const minY = Math.min(-60, ...notesData.map(n => n.y - 50), -70);
+                                    const maxY = Math.max(TABLE_Y + 50, ...notesData.map(n => n.y + 50), 70);
+                                    const viewBoxHeight = maxY - minY;
+
+                                    // Calcula a largura total exigida para o SVG ativar a barra de rolagem do container
+                                    const svgWidth = Math.max(800, notesData.length * 50 + 150);
+
+                                    return (
+                                        <svg width={svgWidth} height="85%" viewBox={`0 ${minY} ${svgWidth} ${viewBoxHeight}`} style={{ display: 'block', minWidth: `${svgWidth}px` }}>
+
+                                            {Array.from({ length: 35 }).map((_, i) => {
+                                                const step = 15 - i;
+                                                const yLine = -step * 5;
+                                                const oct = Math.floor(step / 7);
+                                                const deg = ((step % 7) + 7) % 7;
+                                                const midiEquivalent = 60 + (oct * 12) + [0, 2, 4, 5, 7, 9, 11][deg];
+
+                                                return (
+                                                    <rect
+                                                        key={`click-${i}`} x="30" y={yLine - 2.5} width={svgWidth - 40} height="5" fill="transparent"
+                                                        className="hover:fill-violet-400 hover:opacity-20 cursor-pointer"
+                                                        onClick={() => {
+                                                            let notesArr = activeChord.notes.split(',').map(s => s.trim()).filter(Boolean);
+                                                            const idx = notesArr.indexOf(midiEquivalent.toString());
+                                                            if (idx > -1) notesArr.splice(idx, 1);
+                                                            else notesArr.push(midiEquivalent.toString());
+
+                                                            const newChords = [...tab15Chords];
+                                                            newChords[activeChordIndex].notes = notesArr.join(', ');
+                                                            setTab15Chords(newChords);
+
+                                                            const targetHz = 440 * Math.pow(2, (midiEquivalent - 69) / 12);
+                                                            playAudio([getClosestMicrotonalHz(targetHz, activeChord.tuning, activeChord.anchorHz, activeChord.customTuningObj)], true);
+                                                        }}
+                                                    />
+                                                );
+                                            })}
+
+                                            {[-10, -20, -30, -40, -50].map(yL => <line key={`t${yL}`} x1="30" y1={yL} x2={svgWidth - 40} y2={yL} stroke="#333" strokeWidth="1" className="pointer-events-none" />)}
+                                            {[20, 30, 40, 50, 60].map(yL => <line key={`b${yL}`} x1="30" y1={yL} x2={svgWidth - 40} y2={yL} stroke="#333" strokeWidth="1" className="pointer-events-none" />)}
+
+                                            <text x="35" y="-20" fontSize="42" fontFamily="Bravura, serif" fill="#555" dominantBaseline="central" className="pointer-events-none">{'\uE050'}</text>
+                                            <text x="35" y="30" fontSize="42" fontFamily="Bravura, serif" fill="#555" dominantBaseline="central" className="pointer-events-none">{'\uE062'}</text>
+                                            <line x1="30" y1="-50" x2="30" y2="60" stroke="#555" strokeWidth="3" />
+
+                                            {notesData.map(note => {
+                                                const isTreble = note.step >= 0;
+                                                const stemDown = note.step >= (isTreble ? 6 : -6);
+                                                return (
+                                                    <g key={note.id} transform={`translate(${note.x}, ${note.y})`} className="pointer-events-none">
+                                                        {note.ledgers.map(lY => <line key={lY} x1="-14" y1={lY - note.y} x2="14" y2={lY - note.y} stroke="#000" strokeWidth="2" />)}
+                                                        <ellipse cx="0" cy="0" rx="5.5" ry="4" fill="#000" transform="rotate(-20)" />
+                                                        <line x1={stemDown ? -5 : 5} y1="0" x2={stemDown ? -5 : 5} y2={stemDown ? 30 : -30} stroke="#000" strokeWidth="1.5" />
+                                                        <text x={note.xOffset} y={note.yOffset} fontSize={note.fontSize} fontFamily={note.font} fill="#000" textAnchor="start" dominantBaseline="central">{note.char}</text>
+                                                        <text x="0" y={stemDown ? -20 : 35} fontSize="10" fontFamily="monospace" fill="#e04e8a" textAnchor="middle" fontWeight="bold">{note.centsLabel}</text>
+                                                    </g>
+                                                );
+                                            })}
+                                        </svg>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* ========================================= */}
+                {/* ABA 16: COMPARADOR ESPECTRAL (TXT STYLE)  */}
+                {/* ========================================= */}
+                {activeTool === 16 && (
+                    <div className="flex w-full h-full bg-gray-800">
+                        <div className="w-[300px] flex-shrink-0 bg-slate-900 p-4 border-r border-slate-700 flex flex-col space-y-4">
+                            <h3 className="text-yellow-400 font-bold text-[10px] uppercase tracking-wider">Mesa de Luz Espectral</h3>
+
+                            <div className="bg-slate-950 p-3 rounded border border-slate-700">
+                                <label className="text-[10px] text-slate-500 uppercase block mb-1">Âncora Global da Régua:</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <span className="text-[8px] text-slate-600 block text-center">MIDI</span>
+                                        <input
+                                            type="number" value={tab16AnchorMidi}
+                                            onChange={e => {
+                                                const m = Number(e.target.value);
+                                                setTab16AnchorMidi(m);
+                                                setTab16AnchorHz(Number((440 * Math.pow(2, (m - 69) / 12)).toFixed(2)));
+                                            }}
+                                            className="w-full bg-slate-800 text-xs p-1.5 rounded border border-slate-600 text-white text-center font-bold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <span className="text-[8px] text-slate-600 block text-center">Hertz</span>
+                                        <input type="number" step="any" value={tab16AnchorHz} onChange={e => setTab16AnchorHz(Number(e.target.value))} className="w-full bg-slate-800 text-xs p-1.5 rounded border border-slate-600 text-white text-center font-bold" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <input type="number" value={tab16NewScaleEdo} onChange={e => setTab16NewScaleEdo(Number(e.target.value))} className="w-full bg-slate-800 p-2 rounded border border-slate-600 text-white text-xs" placeholder="Valor EDO" />
+                                <button onClick={() => setTab16Scales([...tab16Scales, { id: Date.now(), name: `${tab16NewScaleEdo}-EDO`, type: "edo", value: tab16NewScaleEdo }])} className="w-full bg-blue-700 hover:bg-blue-600 text-white text-[10px] py-2 rounded font-bold transition">
+                                    + Adicionar EDO
+                                </button>
+                                <button onClick={() => setTab16Scales([...tab16Scales, { id: Date.now(), name: activeTuning.data?.description?.substring(0, 20) || (activeTuning.type === 'edo' ? activeTuning.divisions + "-EDO" : "Escala Global"), type: "custom", tuningObj: activeTuning }])} className="w-full bg-[#00ffcc] hover:bg-[#00ccaa] text-black text-[10px] py-2 rounded font-bold transition">
+                                    + Puxar Aba 11 (Captura Atual)
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto border-t border-slate-700 pt-4 mt-2 custom-scrollbar">
+                                <span className="text-[9px] text-slate-500 uppercase font-bold">Escalas Ativas:</span>
+                                <div className="mt-2 flex flex-col gap-1">
+                                    {tab16Scales.map(s => (
+                                        <div key={s.id} className="flex justify-between items-center bg-slate-950 p-2 rounded border border-slate-800 text-xs text-slate-300">
+                                            <span className="truncate pr-2">{s.name}</span>
+                                            <button onClick={() => setTab16Scales(tab16Scales.filter(x => x.id !== s.id))} className="text-red-500 hover:text-red-400 font-bold">✕</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 p-6 bg-[#0f172a] flex flex-col relative overflow-hidden">
+                            <div className="h-[90px] mb-2 shrink-0">
+                                {tab16SelectedNode ? (
+                                    <div className="bg-[#1e293b] border border-slate-600 p-3 rounded shadow-lg flex flex-col justify-center h-full w-full max-w-3xl">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Detalhes da Nota (Comparada com 12-TET)</span>
+                                            <button onClick={() => setTab16SelectedNode(null)} className="text-slate-500 hover:text-red-400 text-xs font-bold">FECHAR ✕</button>
+                                        </div>
+                                        <div className="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700">
+                                            <span className="font-bold text-slate-300 w-16 text-sm">{tab16SelectedNode.noteName}</span>
+                                            <span className={`${Math.abs(tab16SelectedNode.centsDev) <= 0.05 ? 'text-[#34d399]' : (tab16SelectedNode.centsDev > 0.05 ? 'text-[#f87171]' : 'text-[#60a5fa]')} font-bold text-center flex-1 text-sm font-mono tracking-wider`}>
+                                                {Math.abs(tab16SelectedNode.centsDev) <= 0.05 ? '0c' : `${tab16SelectedNode.centsDev > 0 ? '+' : ''}${tab16SelectedNode.centsDev.toFixed(2)}c`}
+                                            </span>
+                                            <span className="text-slate-400 w-24 text-right font-mono text-sm">{tab16SelectedNode.hz.toFixed(2)}Hz</span>
+                                            <button onClick={() => playAudio([tab16SelectedNode.hz], true)} className="ml-6 bg-violet-600 hover:bg-violet-500 text-white px-3 py-1 rounded text-xs font-bold transition">🎵 Ouvir</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="h-full flex flex-col justify-center">
+                                        <h2 className="text-xl font-bold text-white mb-1">Análise de Colisão (0 a 1200 Cents)</h2>
+                                        <p className="text-xs text-slate-400">Passe o rato no gráfico para iluminar colisões (&lt; 5c). Clique no nó para ver o painel de desvios e tocar a nota.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar border border-slate-800 rounded-lg bg-slate-950 relative p-4" onMouseLeave={() => setTab16HoveredCents(null)}>
+                                <svg width="100%" height={Math.max(400, tab16Scales.length * 80 + 40)} style={{ minWidth: '1500px' }}>
+                                    {Array.from({ length: 13 }).map((_, i) => (
+                                        <g key={`bg-${i}`}>
+                                            <line x1={`${(i / 12) * 100}%`} y1="0" x2={`${(i / 12) * 100}%`} y2="100%" stroke="#1f2937" strokeWidth="1" strokeDasharray="4 4" />
+                                            <text x={`${(i / 12) * 100}%`} y="15" fill="#4b5563" fontSize="10" textAnchor="middle">{i * 100}</text>
+                                        </g>
+                                    ))}
+
+                                    {tab16Scales.map((scale, sIdx) => {
+                                        const y = 60 + sIdx * 80;
+                                        let scalePoints = [];
+
+                                        // O Mapeamento Absoluto dos Pontos (Calcula as escalas customizadas puxadas da Aba 11)
+                                        if (scale.type === 'edo') {
+                                            for (let i = 0; i <= scale.value; i++) scalePoints.push(i * (1200 / scale.value));
+                                        } else if (scale.type === 'custom' && scale.tuningObj) {
+                                            if (scale.tuningObj.type === 'edo') {
+                                                for (let i = 0; i <= scale.tuningObj.divisions; i++) scalePoints.push(i * (1200 / scale.tuningObj.divisions));
+                                            } else if (scale.tuningObj.type === 'scala' && scale.tuningObj.data) {
+                                                scalePoints = [0, ...scale.tuningObj.data.scale.map(s => s.cents)];
+                                            }
+                                        }
+
+                                        return (
+                                            <g key={scale.id}>
+                                                <text x="5" y={y - 15} fill="#94a3b8" fontSize="11" fontWeight="bold">{scale.name}</text>
+                                                <line x1="0" y1={y} x2="100%" y2={y} stroke="#334155" strokeWidth="2" />
+
+                                                {scalePoints.map((cents, pIdx) => {
+                                                    const isHovered = tab16HoveredCents !== null && Math.abs(cents - tab16HoveredCents) <= 5.5;
+                                                    const isSelected = tab16SelectedNode && Math.abs(cents - tab16SelectedNode.cents) < 0.1 && tab16SelectedNode.scale === scale.name;
+
+                                                    return (
+                                                        <g
+                                                            key={`mark-${pIdx}`}
+                                                            onMouseEnter={() => setTab16HoveredCents(cents)}
+                                                            onClick={() => {
+                                                                const hz = tab16AnchorHz * Math.pow(2, cents / 1200);
+                                                                const midiFloat = 69 + 12 * Math.log2(hz / 440);
+                                                                const closest12TET = Math.round(cents / 100) * 100;
+                                                                setTab16SelectedNode({
+                                                                    scale: scale.name,
+                                                                    cents: cents,
+                                                                    hz: hz,
+                                                                    centsDev: cents - closest12TET,
+                                                                    noteName: noteNames[((Math.round(midiFloat) % 12) + 12) % 12] + (Math.floor(midiFloat / 12) - 1)
+                                                                });
+                                                            }}
+                                                            className="cursor-crosshair"
+                                                        >
+                                                            {isHovered && <line x1={`${(cents / 1200) * 100}%`} y1="0" x2={`${(cents / 1200) * 100}%`} y2="100%" stroke="#00ffcc" strokeWidth="1.5" opacity="0.5" className="pointer-events-none" />}
+                                                            <circle cx={`${(cents / 1200) * 100}%`} cy={y} r={isHovered || isSelected ? 8 : 5} fill={isSelected ? "#ffdd57" : (isHovered ? "#00ffcc" : "#64748b")} className="transition-all" />
+                                                            {(isHovered || isSelected) && (
+                                                                <g className="pointer-events-none">
+                                                                    <rect x={`calc(${(cents / 1200) * 100}% - 25px)`} y={y + 12} width="50" height="18" fill="#000" rx="4" />
+                                                                    <text x={`${(cents / 1200) * 100}%`} y={y + 24} fill={isSelected ? "#ffdd57" : "#00ffcc"} fontSize="9" fontWeight="bold" textAnchor="middle">{cents.toFixed(1)}¢</text>
+                                                                </g>
+                                                            )}
+                                                        </g>
+                                                    );
+                                                })}
+                                            </g>
+                                        );
+                                    })}
+                                </svg>
+                            </div>
                         </div>
                     </div>
                 )}

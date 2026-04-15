@@ -224,6 +224,38 @@ const codeData = [
             en: "Input the array of frequencies. Select the desired notation standard. The interface renders the staff with appropriate accidentals and enables Pitch Bend metadata tracking for external DAWs.",
             es: "Introduzca las frecuencias de entrada. Seleccione el estándar de notación deseado. La interfaz renderiza el pentagrama con las alteraciones apropiadas y permite el seguimiento de datos Pitch Bend para exportación."
         }
+    },
+    {
+        id: "tool-sequencer", type: "tool", toolIndex: 15,
+        label: "Sequenciador Voice Leading",
+        color: "#8b5cf6",
+        icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 5v14l11-7z" /></g>,
+        contexto: {
+            pt: "Motor de sequenciamento polimicrotonal. Permite criar progressões harmônicas onde cada acorde reside no seu próprio universo de afinação. O motor de áudio Web Audio calcula o deslizamento (morphing) contínuo das frequências.",
+            en: "Polymicrotonal sequencing engine. Allows creating harmonic progressions where each chord resides in its own tuning universe. The Web Audio engine calculates the continuous glissando (morphing) of frequencies.",
+            es: "Motor de secuenciación polimicrotonal. Permite crear progresiones armónicas donde cada acorde reside en su propio universo de afinación. El motor calcula el deslizamiento (morphing) continuo de las frecuencias."
+        },
+        comoUsar: {
+            pt: "Adicione blocos de acordes. Defina as notas e selecione a afinação específica para aquele bloco. Clique em 'Morphing Sequence' para ouvir a transição contínua entre as afinações.",
+            en: "Add chord blocks. Define notes and select the specific tuning for that block. Click 'Morphing Sequence' to hear the continuous transition between tunings.",
+            es: "Agregue bloques de acordes. Defina notas y seleccione la afinación específica para ese bloque. Haga clic en 'Morphing Sequence' para escuchar la transición continua entre afinaciones."
+        }
+    },
+    {
+        id: "tool-comparador", type: "tool", toolIndex: 16,
+        label: "Comparador Espectral",
+        color: "#f59e0b",
+        icon: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></g>,
+        contexto: {
+            pt: "Mesa de luz analítica para escalas. Mapeia múltiplas divisões da oitava (EDOs ou JI) em trilhas paralelas sobre um eixo de 1200 Cents, permitindo análise visual de proximidade e dissonância.",
+            en: "Analytical light table for scales. Maps multiple octave divisions (EDOs or JI) into parallel tracks over a 1200 Cents axis, allowing visual analysis of proximity and dissonance.",
+            es: "Mesa de luz analítica para escalas. Mapea múltiples divisiones de la octava (EDOs o JI) en pistas paralelas sobre un eje de 1200 Cents, permitiendo análisis visual de proximidad y disonancia."
+        },
+        comoUsar: {
+            pt: "Adicione escalas personalizadas pelo menu lateral ou importe a escala global. Passe o mouse sobre os nós no gráfico SVG para inspecionar os desvios exatos em Cents.",
+            en: "Add custom scales via the sidebar or import the global scale. Hover over the nodes on the SVG graph to inspect exact cent deviations.",
+            es: "Agregue escalas personalizadas a través de la barra lateral o importe la escala global. Pase el ratón sobre los nodos en el gráfico SVG para inspeccionar las desviaciones exactas en Cents."
+        }
     }
 ];
 
