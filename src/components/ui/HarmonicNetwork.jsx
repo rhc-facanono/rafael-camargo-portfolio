@@ -655,48 +655,74 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         return anchorHz * Math.pow(2, closestCents / 1200);
     };
 
-    const playMorphTransition = (idx) => {
-        if (idx >= tab15Chords.length - 1) return; // Não há próximo acorde
+    // FUNÇÃO UNIVERSAL DE LEITURA (Lê C4, 440Hz ou 60)
+    const parseNoteToHz = (str) => {
+        const s = str.trim();
+        if (!s) return NaN;
+
+        // 1. Tenta ler nome da nota (Ex: C4, F#5, Bb3)
+        const regex = /^([CDEFGAB])(#|b)?(-?\d+)$/i;
+        const match = s.match(regex);
+        if (match) {
+            const note = match[1].toUpperCase();
+            const acc = match[2];
+            const oct = parseInt(match[3], 10);
+            const baseOffsets = { 'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11 };
+            let midi = baseOffsets[note] + (oct + 1) * 12;
+            if (acc === '#') midi += 1;
+            if (acc === 'b') midi -= 1;
+            return 440 * Math.pow(2, (midi - 69) / 12);
+        }
+
+        // 2. Tenta ler como Hertz ou MIDI
+        if (s.toLowerCase().endsWith('hz')) return parseFloat(s);
+        const num = parseFloat(s);
+        if (!isNaN(num)) return 440 * Math.pow(2, (num - 69) / 12);
+        return NaN;
+    };
+
+    const playMorphTransition = async (idx) => {
+        if (idx >= tab15Chords.length - 1) return;
         stopAudio();
         currentAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (currentAudioCtx.state === 'suspended') await currentAudioCtx.resume();
+
         const masterGain = currentAudioCtx.createGain();
         masterGain.gain.value = 0.15;
         masterGain.connect(currentAudioCtx.destination);
 
         const chord1 = tab15Chords[idx];
         const chord2 = tab15Chords[idx + 1];
-        const rawMidi1 = chord1.notes.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
-        const rawMidi2 = chord2.notes.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
-        const hzArr1 = rawMidi1.map(m => getClosestMicrotonalHz(440 * Math.pow(2, (m - 69) / 12), chord1.tuning, chord1.anchorHz));
-        const hzArr2 = rawMidi2.map(m => getClosestMicrotonalHz(440 * Math.pow(2, (m - 69) / 12), chord2.tuning, chord2.anchorHz));
+
+        // Usa o novo tradutor para o Morphing funcionar com C4, E4, etc.
+        const hz1 = chord1.notes.split(',').map(parseNoteToHz).filter(n => !isNaN(n)).map(h => getClosestMicrotonalHz(h, chord1.tuning, chord1.anchorHz, chord1.customTuningObj));
+        const hz2 = chord2.notes.split(',').map(parseNoteToHz).filter(n => !isNaN(n)).map(h => getClosestMicrotonalHz(h, chord2.tuning, chord2.anchorHz, chord2.customTuningObj));
 
         const now = currentAudioCtx.currentTime;
-        const DUR = 3.5, STABLE = 1.0, GLIDE = 1.5;
-        const maxV = Math.max(hzArr1.length, hzArr2.length);
+        const DUR = 3.0;
+        const maxV = Math.max(hz1.length, hz2.length);
 
         for (let v = 0; v < maxV; v++) {
             const osc = currentAudioCtx.createOscillator();
-            const gain = currentAudioCtx.createGain();
+            const g = currentAudioCtx.createGain();
             osc.type = v === 0 ? 'triangle' : 'sine';
 
-            const f1 = v < hzArr1.length ? hzArr1[v] : hzArr1[hzArr1.length - 1] || 440;
-            const v1 = v < hzArr1.length ? 1 : 0;
-            const f2 = v < hzArr2.length ? hzArr2[v] : hzArr2[hzArr2.length - 1] || 440;
+            const f1 = hz1[v] || hz1[hz1.length - 1] || 261.63;
+            const f2 = hz2[v] || hz2[hz2.length - 1] || 261.63;
+            const v1 = v < hz1.length ? 1 : 0;
             const v2 = v < hz2.length ? 1 : 0;
 
             osc.frequency.setValueAtTime(f1, now);
-            osc.frequency.setValueAtTime(f1, now + STABLE);
-            osc.frequency.exponentialRampToValueAtTime(f2, now + STABLE + GLIDE);
+            osc.frequency.exponentialRampToValueAtTime(f2, now + DUR);
 
-            gain.gain.setValueAtTime(0, now);
-            gain.gain.linearRampToValueAtTime(v1, now + 0.1);
-            gain.gain.setValueAtTime(v1, now + STABLE);
-            gain.gain.linearRampToValueAtTime(v2, now + STABLE + GLIDE);
-            gain.gain.setValueAtTime(v2, now + DUR - 0.5);
-            gain.gain.linearRampToValueAtTime(0, now + DUR);
+            g.gain.setValueAtTime(0, now);
+            g.gain.linearRampToValueAtTime(v1, now + 0.1);
+            g.gain.setValueAtTime(v1, now + 1.0);
+            g.gain.linearRampToValueAtTime(v2, now + DUR);
+            g.gain.linearRampToValueAtTime(0, now + DUR + 0.5);
 
-            osc.connect(gain); gain.connect(masterGain);
-            osc.start(now); osc.stop(now + DUR + 0.5);
+            osc.connect(g); g.connect(masterGain);
+            osc.start(now); osc.stop(now + DUR + 1);
             activeOscillators.push(osc);
         }
     };
@@ -1164,7 +1190,43 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
             if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
                 e.preventDefault();
 
-                // Mapeia qual input de texto estamos editando baseado na aba ativa
+                // LÓGICA ESPECIAL PARA ABA 15 (Reconhece C4, 60 ou 440Hz)
+                if (activeTool === 15) {
+                    if (tab15Chords.length === 0) return;
+                    const newChords = [...tab15Chords];
+                    const chord = newChords[activeChordIndex];
+                    let parts = chord.notes.split(',').map(s => s.trim()).filter(Boolean);
+                    if (parts.length === 0) return;
+
+                    let lastPart = parts[parts.length - 1];
+                    const baseHz = parseNoteToHz(lastPart);
+                    if (isNaN(baseHz)) return;
+
+                    let newHz = baseHz * (e.key === 'ArrowUp' ? 1.059463 : 0.943874); // Sobe/Desce 1 semitom
+                    let newMidi = 69 + 12 * Math.log2(newHz / 440);
+
+                    let newValStr = "";
+                    if (lastPart.toLowerCase().includes('hz')) {
+                        newValStr = newHz.toFixed(2) + "Hz";
+                    } else if (!isNaN(parseFloat(lastPart)) && !lastPart.match(/[a-zA-Z]/)) {
+                        newValStr = Math.round(newMidi).toString(); // Mantém como MIDI se era número puro
+                    } else {
+                        // Era um nome de nota (ex: C4) -> Mantém como nome de nota!
+                        const pc = ((Math.round(newMidi) % 12) + 12) % 12;
+                        const oct = Math.floor(newMidi / 12) - 1;
+                        newValStr = noteNames[pc] + oct;
+                    }
+
+                    parts[parts.length - 1] = newValStr;
+                    newChords[activeChordIndex].notes = parts.join(', ');
+                    setTab15Chords(newChords);
+
+                    const microHz = getClosestMicrotonalHz(newHz, chord.tuning, chord.anchorHz, chord.customTuningObj);
+                    playAudio([microHz], true);
+                    return;
+                }
+
+                // LÓGICA PARA AS OUTRAS ABAS (2 a 10)
                 const tabInputMap = {
                     2: { val: tab2InputA, set: setTab2InputA },
                     3: { val: tab3Input, set: setTab3Input },
@@ -1180,44 +1242,31 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                 const current = tabInputMap[activeTool];
                 if (!current || !current.val) return;
 
-                // Pega a última nota da string (ex: "60, 64Hz" -> "64Hz")
                 let parts = current.val.split(',').map(s => s.trim());
                 if (parts.length === 0 || parts[0] === "") return;
 
                 let lastPart = parts[parts.length - 1];
-
-                // Extrai apenas os números (permite decimais e negativos)
                 let match = lastPart.match(/-?\d+(\.\d+)?/);
                 if (!match) return;
 
                 let numVal = parseFloat(match[0]);
-                let suffix = lastPart.replace(match[0], ''); // Guarda "Hz", "c", etc.
-
+                let suffix = lastPart.replace(match[0], '');
                 const stepDir = e.key === 'ArrowUp' ? 1 : -1;
                 let newValStr = "";
 
                 if (isMicrotonalMode) {
-                    // 1. Converte o que está escrito em Hz puros
                     let currentHz = numVal;
                     if (suffix.toLowerCase().trim() === 'hz') currentHz = numVal;
                     else if (suffix.toLowerCase().trim() === 'c') currentHz = midiToHz(numVal / 100);
-                    else currentHz = midiToHz(numVal); // Assume que é o número do Step
+                    else currentHz = midiToHz(numVal);
 
-                    // 2. Acha o degrau atual da escala
                     let currentStep = Math.round(hzToMidi(currentHz));
-                    // 3. Anda um degrau inteiro na escala (19-EDO, JI, Bohlen-Pierce...)
                     let nextStep = currentStep + stepDir;
 
-                    // 4. Formata de volta para a linguagem que o utilizador estava a usar
-                    if (suffix.toLowerCase().trim() === 'hz') {
-                        newValStr = midiToHz(nextStep).toFixed(2);
-                    } else if (suffix.toLowerCase().trim() === 'c') {
-                        newValStr = (nextStep * 100).toString();
-                    } else {
-                        newValStr = nextStep.toString();
-                    }
+                    if (suffix.toLowerCase().trim() === 'hz') newValStr = midiToHz(nextStep).toFixed(2);
+                    else if (suffix.toLowerCase().trim() === 'c') newValStr = (nextStep * 100).toString();
+                    else newValStr = nextStep.toString();
                 } else {
-                    // Modo 12-TET clássico: apenas sobe/desce 1 semitom
                     let newVal = numVal + stepDir;
                     newValStr = Number.isInteger(newVal) ? newVal.toString() : newVal.toFixed(2);
                 }
@@ -1228,9 +1277,8 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
         };
 
         window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeTool, tab2InputA, tab3Input, tab4Input, tab5Input, tab6Input, tab7Carrier, tab8Input, tab9Input, tab10InputA]);
+    }, [activeTool, activeChordIndex, tab15Chords, tab2InputA, tab3Input, tab4Input, tab5Input, tab6Input, tab7Carrier, tab8Input, tab9Input, tab10InputA, isMicrotonalMode, activeTuning]);
 
     const { lastEvent } = useMidi();
     const [activeMidiNotes, setActiveMidiNotes] = useState(new Set());
@@ -1996,8 +2044,18 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                     </select>
                                     {keyColorMode === 'custom' && (
                                         <div>
-                                            <label className="text-[8px] text-gray-500">Use 'W' (Branca) e 'B' (Preta) separadas por vírgula:</label>
-                                            <input type="text" value={customKeyPattern.join(',')} onChange={(e) => setCustomKeyPattern(e.target.value.toUpperCase().split(',').map(s => s.trim()))} className="w-full bg-gray-800 text-xs p-1.5 rounded border border-gray-600 text-white font-mono mt-1" />
+                                            <label className="text-[9px] text-slate-500 uppercase font-bold block mb-1">Entrada Manual (MIDI, Hz, Cents):</label>
+                                            <input
+                                                type="text"
+                                                value={chord.notes}
+                                                onChange={e => {
+                                                    const n = [...tab15Chords];
+                                                    n[index].notes = e.target.value;
+                                                    setTab15Chords(n);
+                                                }}
+                                                placeholder="Ex: 60, 440Hz, +20c"
+                                                className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-[#00ffcc] font-mono text-xs focus:border-[#00ffcc] outline-none transition-colors shadow-inner"
+                                            />
                                         </div>
                                     )}
                                 </div>
@@ -2482,19 +2540,21 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                 )}
 
                 {/* ========================================= */}
-                {/* ABA 15: SEQUENCIADOR (INTERFACE DO TXT)   */}
+                {/* ABA 15: SEQUENCIADOR POLIMICROTONAL       */}
                 {/* ========================================= */}
                 {activeTool === 15 && (
                     <div className="flex w-full h-full bg-[#0d1117] overflow-hidden">
 
+                        {/* PAINEL ESQUERDO: Lista de Acordes e Inputs */}
                         <div className="w-[420px] flex-shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col h-full z-20 shadow-xl">
                             <div className="p-4 border-b border-slate-700 bg-slate-950 flex flex-col gap-3">
                                 <h2 className="text-xl font-bold text-white">Voice Leading Dinâmico</h2>
-                                <div className="flex gap-2 mt-1">
-                                    <button onClick={() => setTab15Chords([...tab15Chords, { id: Date.now(), notes: "60, 64, 67", tuning: "12-TET", anchorMidi: 60, anchorHz: 261.63, isExpanded: true, customTuningObj: null }])} className="flex-1 bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold py-2 rounded transition border border-slate-600">
+                                <p className="text-[10px] text-slate-400">Você pode usar múltiplos ficheiros .scl diferentes na mesma cadência capturando a escala ativa da Aba 11 para cada acorde.</p>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setTab15Chords([...tab15Chords, { id: Date.now(), notes: "C4, E4, G4", tuning: "12-TET", anchorMidi: 60, anchorHz: 261.63, isExpanded: true, showExport: false, customTuningObj: null }])} className="flex-1 bg-blue-700 hover:bg-blue-600 text-white text-[11px] font-bold py-2 rounded transition">
                                         + Novo Acorde
                                     </button>
-                                    <button onClick={playMorphingSequence} className="flex-1 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold py-2 rounded transition shadow-lg shadow-violet-500/30">
+                                    <button onClick={playMorphingSequence} className="flex-1 bg-violet-600 hover:bg-violet-500 text-white text-[11px] font-bold py-2 rounded shadow-lg shadow-violet-500/30 transition">
                                         ▶ Morph Todos
                                     </button>
                                 </div>
@@ -2502,26 +2562,29 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
                                 {tab15Chords.map((chord, index) => {
-                                    const rawMidis = chord.notes.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+                                    // NOVO PARSEAMENTO: Agora suporta C4!
+                                    const rawHzArr = chord.notes.split(',').map(parseNoteToHz).filter(n => !isNaN(n));
+                                    const mappedHzArr = rawHzArr.map(h => getClosestMicrotonalHz(h, chord.tuning, chord.anchorHz, chord.customTuningObj));
+
                                     return (
                                         <div
                                             key={chord.id} onClick={() => setActiveChordIndex(index)}
-                                            className={`p-4 rounded-xl transition-all cursor-pointer relative group flex flex-col gap-3
-                                                ${activeChordIndex === index ? 'border-2 border-violet-500 bg-violet-900/10 shadow-[0_5px_15px_rgba(139,92,246,0.2)]' : 'border-2 border-transparent bg-slate-800 hover:bg-slate-700'}`}
+                                            className={`p-4 rounded-xl border-2 transition-all cursor-pointer relative flex flex-col gap-3
+                                                ${activeChordIndex === index ? 'border-violet-500 bg-violet-900/10' : 'border-transparent bg-slate-800 hover:bg-slate-700'}`}
                                         >
-                                            <button onClick={(e) => { e.stopPropagation(); setTab15Chords(tab15Chords.filter(c => c.id !== chord.id)); setActiveChordIndex(Math.max(0, index - 1)); }} className="absolute top-2 right-2 text-slate-500 hover:text-red-500 opacity-0 group-hover:opacity-100 font-bold transition">✕</button>
+                                            <button onClick={(e) => { e.stopPropagation(); setTab15Chords(tab15Chords.filter(c => c.id !== chord.id)); setActiveChordIndex(Math.max(0, index - 1)); }} className="absolute top-2 right-2 text-slate-500 hover:text-red-500 font-bold transition">✕</button>
 
                                             <div className="flex justify-between items-center border-b border-slate-700 pb-2">
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={(e) => { e.stopPropagation(); const n = [...tab15Chords]; n[index].isExpanded = !n[index].isExpanded; setTab15Chords(n); }} className="text-[#00ffcc] font-bold w-5 h-5 flex items-center justify-center bg-slate-950 rounded hover:bg-slate-700">
+                                                    <button onClick={(e) => { e.stopPropagation(); const n = [...tab15Chords]; n[index].isExpanded = !n[index].isExpanded; setTab15Chords(n); }} className="text-[#00ffcc] font-bold w-5 h-5 bg-slate-950 rounded border border-slate-700 hover:bg-slate-700 flex justify-center items-center">
                                                         {chord.isExpanded ? '▼' : '▶'}
                                                     </button>
-                                                    <h3 className="text-lg font-bold text-white">Acorde #{index + 1}</h3>
+                                                    <h3 className="text-white font-bold">Acorde #{index + 1}</h3>
                                                 </div>
                                                 <select
                                                     value={chord.customTuningObj ? "CUSTOM" : chord.tuning}
                                                     onChange={e => { const n = [...tab15Chords]; n[index].tuning = e.target.value; n[index].customTuningObj = null; setTab15Chords(n); }}
-                                                    className="bg-slate-950 text-white text-xs p-1.5 rounded border border-slate-600 outline-none font-bold cursor-pointer max-w-[130px]"
+                                                    className="bg-slate-950 text-[#00ffcc] text-[10px] p-1.5 rounded border border-slate-600 font-bold max-w-[130px]"
                                                 >
                                                     {chord.customTuningObj && <option value="CUSTOM">[{chord.customTuningObj.data?.description?.substring(0, 8) || "SCL"}]</option>}
                                                     {tab15AvailableTunings.map(t => <option key={t} value={t}>{t}</option>)}
@@ -2533,78 +2596,86 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                                     <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2 rounded border border-slate-700">
                                                         <div>
                                                             <label className="text-[9px] text-slate-500 uppercase block mb-1">Âncora (MIDI):</label>
-                                                            <input
-                                                                type="number" value={chord.anchorMidi}
-                                                                onChange={e => {
-                                                                    const n = [...tab15Chords];
-                                                                    const novoMidi = Number(e.target.value);
-                                                                    n[index].anchorMidi = novoMidi;
-                                                                    n[index].anchorHz = Number((440 * Math.pow(2, (novoMidi - 69) / 12)).toFixed(2));
-                                                                    setTab15Chords(n);
-                                                                }}
-                                                                className="w-full bg-slate-800 text-slate-300 text-xs p-1 rounded border border-slate-600 text-center"
-                                                            />
+                                                            <input type="number" value={chord.anchorMidi} onChange={e => { const n = [...tab15Chords]; const val = Number(e.target.value); n[index].anchorMidi = val; n[index].anchorHz = Number((440 * Math.pow(2, (val - 69) / 12)).toFixed(2)); setTab15Chords(n); }} className="w-full bg-slate-800 text-slate-300 text-xs p-1 rounded border border-slate-600 text-center" />
                                                         </div>
                                                         <div>
                                                             <label className="text-[9px] text-slate-500 uppercase block mb-1">Âncora (Hz):</label>
-                                                            <input
-                                                                type="number" step="any" value={chord.anchorHz}
-                                                                onChange={e => { const n = [...tab15Chords]; n[index].anchorHz = Number(e.target.value); setTab15Chords(n); }}
-                                                                className="w-full bg-slate-800 text-slate-300 text-xs p-1 rounded border border-slate-600 text-center"
-                                                            />
+                                                            <input type="number" step="any" value={chord.anchorHz} onChange={e => { const n = [...tab15Chords]; n[index].anchorHz = Number(e.target.value); setTab15Chords(n); }} className="w-full bg-slate-800 text-slate-300 text-xs p-1 rounded border border-slate-600 text-center" />
                                                         </div>
                                                     </div>
 
-                                                    <button onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const n = [...tab15Chords];
-                                                        n[index].customTuningObj = activeTuning;
-                                                        setTab15Chords(n);
-                                                    }} className="w-full bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-400 text-[10px] font-bold py-1.5 rounded border border-emerald-800 transition">
-                                                        ↓ Snapshot da Aba 11 (.scl)
+                                                    <button onClick={(e) => { e.stopPropagation(); const n = [...tab15Chords]; n[index].customTuningObj = activeTuning; setTab15Chords(n); }} className="w-full bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-400 text-[10px] font-bold py-2 rounded border border-emerald-800 transition">
+                                                        ↓ Capturar Escala da Aba 11 para este acorde
                                                     </button>
 
-                                                    <div className="flex flex-col gap-1">
-                                                        {rawMidis.map((m, vIdx) => {
-                                                            const baseHz = 440 * Math.pow(2, (m - 69) / 12);
-                                                            const mappedHz = getClosestMicrotonalHz(baseHz, chord.tuning, chord.anchorHz, chord.customTuningObj);
-                                                            const deviation = 1200 * Math.log2(mappedHz / baseHz);
+                                                    <div className="bg-slate-950 p-2 rounded border border-slate-700">
+                                                        <label className="text-[9px] text-slate-500 uppercase font-bold block mb-1">Editor de Notas (Ex: C4, 440Hz):</label>
+                                                        <textarea
+                                                            value={chord.notes}
+                                                            onChange={e => { const n = [...tab15Chords]; n[index].notes = e.target.value; setTab15Chords(n); }}
+                                                            className="w-full bg-transparent text-[#00ffcc] font-mono text-xs outline-none resize-none h-12"
+                                                            placeholder="Ex: C4, E4, 440Hz"
+                                                        />
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-1 mt-1">
+                                                        {chord.notes.split(',').map(s => s.trim()).filter(Boolean).map((n, vIdx) => {
+                                                            const baseHzLocal = parseNoteToHz(n);
+                                                            if (isNaN(baseHzLocal)) return null; // Ignora se o texto for inválido
+
+                                                            const mLocal = getClosestMicrotonalHz(baseHzLocal, chord.tuning, chord.anchorHz, chord.customTuningObj);
+                                                            const deviation = 1200 * Math.log2(mLocal / baseHzLocal);
                                                             const sign = deviation > 0.05 ? '+' : '';
                                                             let colorClass = Math.abs(deviation) <= 0.05 ? 'text-[#34d399]' : (deviation > 0.05 ? 'text-[#f87171]' : 'text-[#60a5fa]');
                                                             let devStr = Math.abs(deviation) <= 0.05 ? '0c' : `${sign}${deviation.toFixed(1)}c`;
-                                                            const noteName = noteNames[((Math.round(m) % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
 
                                                             return (
-                                                                <div key={vIdx} className="font-mono text-[11px] p-1.5 rounded bg-[#1e293b] flex justify-between items-center shadow-inner border border-slate-700/50">
-                                                                    <span className="font-bold text-slate-300 w-8">{noteName}</span>
+                                                                <div key={vIdx} className="font-mono text-[10px] p-1.5 rounded bg-slate-900 border border-slate-700/50 flex justify-between items-center">
+                                                                    <span className="font-bold text-slate-300 w-8">{n}</span>
                                                                     <span className={`${colorClass} font-bold flex-1 text-center`}>{devStr}</span>
-                                                                    <span className="text-slate-400 w-14 text-right">{mappedHz.toFixed(1)}Hz</span>
+                                                                    <span className="text-slate-400 w-16 text-right">{mLocal.toFixed(1)}Hz</span>
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
                                                                             const newChords = [...tab15Chords];
-                                                                            let notesArr = chord.notes.split(',').map(s => s.trim()).filter(Boolean);
-                                                                            notesArr.splice(vIdx, 1);
-                                                                            newChords[index].notes = notesArr.join(', ');
+                                                                            let arr = chord.notes.split(',').map(s => s.trim()).filter(Boolean);
+                                                                            arr.splice(vIdx, 1);
+                                                                            newChords[index].notes = arr.join(', ');
                                                                             setTab15Chords(newChords);
                                                                         }}
-                                                                        className="ml-2 text-slate-500 hover:text-red-500 font-bold transition flex items-center justify-center w-4"
-                                                                        title="Remover Nota"
+                                                                        className="text-red-500 hover:text-red-400 px-1 ml-2 font-bold"
                                                                     >✕</button>
                                                                 </div>
                                                             );
                                                         })}
                                                     </div>
 
-                                                    <div className="flex gap-2 mt-1">
-                                                        <button onClick={(e) => { e.stopPropagation(); playAudio(rawMidis.map(m => getClosestMicrotonalHz(440 * Math.pow(2, (m - 69) / 12), chord.tuning, chord.anchorHz, chord.customTuningObj)), true); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold py-2 rounded transition">
-                                                            ▶ Ouvir
+                                                    {chord.showExport && (
+                                                        <div className="bg-slate-950 p-3 rounded border border-slate-700 mt-2 font-mono text-[9px] text-slate-400 select-all leading-relaxed shadow-inner">
+                                                            <div className="text-blue-400 mb-1 font-bold border-b border-slate-800 pb-1 flex justify-between">
+                                                                <span>DADOS EXPORTÁVEIS (Ctrl+C)</span>
+                                                                <button onClick={(e) => { e.stopPropagation(); const n = [...tab15Chords]; n[index].showExport = false; setTab15Chords(n); }} className="text-slate-500 hover:text-white">✕</button>
+                                                            </div>
+                                                            <div><span className="text-slate-500">Notas:</span> [{rawHzArr.map(h => noteNames[((Math.round(69 + 12 * Math.log2(h / 440)) % 12) + 12) % 12] + (Math.floor((69 + 12 * Math.log2(h / 440)) / 12) - 1)).join(', ')}]</div>
+                                                            <div><span className="text-slate-500">MIDI:</span> [{rawHzArr.map(h => (69 + 12 * Math.log2(h / 440)).toFixed(2)).join(', ')}]</div>
+                                                            <div><span className="text-slate-500">Hertz:</span> [{mappedHzArr.map(h => h.toFixed(2) + 'Hz').join(', ')}]</div>
+                                                            <div><span className="text-slate-500">Cents:</span> [{rawHzArr.map((bHz, i) => {
+                                                                const dev = 1200 * Math.log2(mappedHzArr[i] / bHz);
+                                                                return (dev >= 0 ? '+' : '') + dev.toFixed(1) + 'c';
+                                                            }).join(', ')}]</div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex gap-1 mt-2">
+                                                        <button onClick={(e) => { e.stopPropagation(); playAudio(mappedHzArr, true); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold py-2 rounded transition">▶ Ouvir Acorde</button>
+                                                        {index < tab15Chords.length - 1 && <button onClick={(e) => { e.stopPropagation(); playMorphTransition(index); }} className="flex-1 bg-violet-700 hover:bg-violet-600 text-white text-[10px] font-bold py-2 rounded">⤨ Morph p/ Próximo</button>}
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); const n = [...tab15Chords]; n[index].showExport = !n[index].showExport; setTab15Chords(n); }}
+                                                            className={`bg-slate-800 hover:bg-slate-700 text-[12px] py-1.5 px-3 rounded transition ${chord.showExport ? 'text-blue-400 border border-blue-500/50' : 'text-slate-300'}`}
+                                                            title="Mostrar Dados Exportáveis"
+                                                        >
+                                                            📋
                                                         </button>
-                                                        {index < tab15Chords.length - 1 && (
-                                                            <button onClick={(e) => { e.stopPropagation(); playMorphTransition(index); }} className="flex-1 bg-violet-700 hover:bg-violet-600 text-white text-[10px] font-bold py-2 rounded transition shadow-lg">
-                                                                ⤨ Morph
-                                                            </button>
-                                                        )}
                                                     </div>
                                                 </>
                                             )}
@@ -2614,86 +2685,88 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                             </div>
                         </div>
 
-                        {/* PAINEL DIREITO: Pauta SVG Interativa com Scroll Horizontal Nativo */}
+                        {/* PAINEL DIREITO: Pauta SVG (Com suporte a C4) */}
                         <div className="flex-1 bg-[#fdfdfd] relative flex flex-col h-full overflow-hidden">
-                            <div className="p-3 bg-slate-900 border-b border-slate-700 flex justify-between items-center shadow-md z-10">
-                                <span className="text-[#00ffcc] text-xs font-mono font-bold bg-slate-950 px-3 py-1.5 rounded border border-[#00ffcc]/30">
-                                    Editando: Acorde #{activeChordIndex + 1}
-                                </span>
-                                <span className="text-slate-400 text-[10px]">A pauta rola horizontalmente. Clique para adicionar/remover.</span>
+                            <div className="p-3 bg-slate-900 border-b border-slate-700 flex justify-between items-center shadow-md z-10 shrink-0">
+                                <span className="text-[#00ffcc] text-xs font-mono font-bold bg-slate-950 px-3 py-1.5 rounded border border-[#00ffcc]/30">Editando: Acorde #{activeChordIndex + 1}</span>
+                                <span className="text-slate-400 text-[10px]">A pauta tem scroll infinito. Atalho: Alt + Setas.</span>
                             </div>
 
-                            {/* O container usa 'block' (sem flex items-center) para garantir que o scroll inicie na esquerda corretamente */}
-                            <div className="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar bg-gray-50 pt-8 pl-4">
+                            <div className="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar bg-[#f8f9fa] block pt-16 pl-4">
                                 {(() => {
                                     const activeChord = tab15Chords[activeChordIndex];
                                     if (!activeChord) return null;
 
-                                    const rawMidis = activeChord.notes.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
-                                    const microtonalHzArray = rawMidis.map(m => getClosestMicrotonalHz(440 * Math.pow(2, (m - 69) / 12), activeChord.tuning, activeChord.anchorHz, activeChord.customTuningObj));
+                                    // MÁGICA AQUI: O SVG agora lê o "C4" da caixa usando o parseNoteToHz
+                                    const rawHzArr = activeChord.notes.split(',').map(parseNoteToHz).filter(n => !isNaN(n));
+                                    const microHz = rawHzArr.map(h => getClosestMicrotonalHz(h, activeChord.tuning, activeChord.anchorHz, activeChord.customTuningObj));
 
-                                    // Gera as notas originais
-                                    let notesData = generateNotationData(microtonalHzArray, baseHz, baseMidi, notationSystem);
+                                    let notesData = generateNotationData(microHz, baseHz, baseMidi, notationSystem);
+                                    notesData = notesData.map((n, i) => ({ ...n, x: 80 + (i * 50), y: -n.step * 5 }));
 
-                                    // A MÁGICA DO ESPAÇAMENTO: Comprime o eixo X para as notas ficarem mais juntas (50px em vez de 90px)
-                                    notesData = notesData.map((n, i) => ({ ...n, x: 100 + (i * 50) }));
-
-                                    const TABLE_Y = 60;
-                                    const minY = Math.min(-60, ...notesData.map(n => n.y - 50), -70);
-                                    const maxY = Math.max(TABLE_Y + 50, ...notesData.map(n => n.y + 50), 70);
-                                    const viewBoxHeight = maxY - minY;
-
-                                    // Calcula a largura total exigida para o SVG ativar a barra de rolagem do container
-                                    const svgWidth = Math.max(800, notesData.length * 50 + 150);
+                                    const svgWidth = Math.max(900, notesData.length * 50 + 200);
+                                    const minY = Math.min(-100, ...notesData.map(n => n.y - 50));
+                                    const maxY = Math.max(100, ...notesData.map(n => n.y + 50));
+                                    const vHeight = maxY - minY;
 
                                     return (
-                                        <svg width={svgWidth} height="85%" viewBox={`0 ${minY} ${svgWidth} ${viewBoxHeight}`} style={{ display: 'block', minWidth: `${svgWidth}px` }}>
+                                        <svg width={svgWidth} height="350" viewBox={`0 ${minY} ${svgWidth} ${vHeight}`} style={{ display: 'block', minWidth: `${svgWidth}px` }}>
 
-                                            {Array.from({ length: 35 }).map((_, i) => {
-                                                const step = 15 - i;
+                                            {/* HITBOXES DE CLIQUE */}
+                                            {Array.from({ length: 40 }).map((_, i) => {
+                                                const step = 20 - i;
                                                 const yLine = -step * 5;
                                                 const oct = Math.floor(step / 7);
                                                 const deg = ((step % 7) + 7) % 7;
-                                                const midiEquivalent = 60 + (oct * 12) + [0, 2, 4, 5, 7, 9, 11][deg];
+                                                const baseMidiVal = 60 + (oct * 12) + [0, 2, 4, 5, 7, 9, 11][deg];
 
                                                 return (
                                                     <rect
-                                                        key={`click-${i}`} x="30" y={yLine - 2.5} width={svgWidth - 40} height="5" fill="transparent"
-                                                        className="hover:fill-violet-400 hover:opacity-20 cursor-pointer"
-                                                        onClick={() => {
-                                                            let notesArr = activeChord.notes.split(',').map(s => s.trim()).filter(Boolean);
-                                                            const idx = notesArr.indexOf(midiEquivalent.toString());
-                                                            if (idx > -1) notesArr.splice(idx, 1);
-                                                            else notesArr.push(midiEquivalent.toString());
+                                                        key={`hit-${i}`} x="0" y={yLine - 2.5} width={svgWidth} height="5" fill="transparent"
+                                                        className="hover:fill-violet-500/10 cursor-pointer"
+                                                        onClick={(e) => {
+                                                            let modifier = 0;
+                                                            if (e.shiftKey) modifier = 1;
+                                                            if (e.altKey) modifier = -1;
 
-                                                            const newChords = [...tab15Chords];
-                                                            newChords[activeChordIndex].notes = notesArr.join(', ');
-                                                            setTab15Chords(newChords);
+                                                            const finalMidi = baseMidiVal + modifier;
+                                                            const finalNoteName = noteNames[((finalMidi % 12) + 12) % 12] + (Math.floor(finalMidi / 12) - 1);
 
-                                                            const targetHz = 440 * Math.pow(2, (midiEquivalent - 69) / 12);
+                                                            let arr = activeChord.notes.split(',').map(s => s.trim()).filter(Boolean);
+
+                                                            const idx = arr.indexOf(finalNoteName);
+                                                            if (idx > -1) arr.splice(idx, 1);
+                                                            else arr.push(finalNoteName);
+
+                                                            const n = [...tab15Chords];
+                                                            n[activeChordIndex].notes = arr.join(', ');
+                                                            setTab15Chords(n);
+
+                                                            const targetHz = 440 * Math.pow(2, (finalMidi - 69) / 12);
                                                             playAudio([getClosestMicrotonalHz(targetHz, activeChord.tuning, activeChord.anchorHz, activeChord.customTuningObj)], true);
                                                         }}
                                                     />
                                                 );
                                             })}
 
-                                            {[-10, -20, -30, -40, -50].map(yL => <line key={`t${yL}`} x1="30" y1={yL} x2={svgWidth - 40} y2={yL} stroke="#333" strokeWidth="1" className="pointer-events-none" />)}
-                                            {[20, 30, 40, 50, 60].map(yL => <line key={`b${yL}`} x1="30" y1={yL} x2={svgWidth - 40} y2={yL} stroke="#333" strokeWidth="1" className="pointer-events-none" />)}
+                                            {/* LINHAS FIXAS DA PAUTA */}
+                                            {[-10, -20, -30, -40, -50].map(y => <line key={`t${y}`} x1="40" y1={y} x2={svgWidth - 40} y2={y} stroke="#ced4da" strokeWidth="1.5" className="pointer-events-none" />)}
+                                            {[10, 20, 30, 40, 50].map(y => <line key={`b${y}`} x1="40" y1={y} x2={svgWidth - 40} y2={y} stroke="#ced4da" strokeWidth="1.5" className="pointer-events-none" />)}
 
-                                            <text x="35" y="-20" fontSize="42" fontFamily="Bravura, serif" fill="#555" dominantBaseline="central" className="pointer-events-none">{'\uE050'}</text>
-                                            <text x="35" y="30" fontSize="42" fontFamily="Bravura, serif" fill="#555" dominantBaseline="central" className="pointer-events-none">{'\uE062'}</text>
-                                            <line x1="30" y1="-50" x2="30" y2="60" stroke="#555" strokeWidth="3" />
+                                            {/* Claves reposicionadas nas suas linhas nominais exatas (Sol=-20, Fá=20) */}
+                                            <text x="45" y="-20" fontSize="45" fontFamily="Bravura, serif" fill="#adb5bd" dominantBaseline="central" className="pointer-events-none">{'\uE050'}</text>
+                                            <text x="45" y="20" fontSize="45" fontFamily="Bravura, serif" fill="#adb5bd" dominantBaseline="central" className="pointer-events-none">{'\uE062'}</text>
 
                                             {notesData.map(note => {
                                                 const isTreble = note.step >= 0;
                                                 const stemDown = note.step >= (isTreble ? 6 : -6);
                                                 return (
                                                     <g key={note.id} transform={`translate(${note.x}, ${note.y})`} className="pointer-events-none">
-                                                        {note.ledgers.map(lY => <line key={lY} x1="-14" y1={lY - note.y} x2="14" y2={lY - note.y} stroke="#000" strokeWidth="2" />)}
-                                                        <ellipse cx="0" cy="0" rx="5.5" ry="4" fill="#000" transform="rotate(-20)" />
-                                                        <line x1={stemDown ? -5 : 5} y1="0" x2={stemDown ? -5 : 5} y2={stemDown ? 30 : -30} stroke="#000" strokeWidth="1.5" />
-                                                        <text x={note.xOffset} y={note.yOffset} fontSize={note.fontSize} fontFamily={note.font} fill="#000" textAnchor="start" dominantBaseline="central">{note.char}</text>
-                                                        <text x="0" y={stemDown ? -20 : 35} fontSize="10" fontFamily="monospace" fill="#e04e8a" textAnchor="middle" fontWeight="bold">{note.centsLabel}</text>
+                                                        {note.ledgers.map(lY => <line key={lY} x1="-14" y1={lY - note.y} x2="14" y2={lY - note.y} stroke="#212529" strokeWidth="2" />)}
+                                                        <ellipse cx="0" cy="0" rx="5.5" ry="4" fill="#212529" transform="rotate(-20)" />
+                                                        <line x1={stemDown ? -5 : 5} y1="0" x2={stemDown ? -5 : 5} y2={stemDown ? 25 : -25} stroke="#212529" strokeWidth="1.5" />
+                                                        <text x={note.xOffset} y={note.yOffset} fontSize="38" fontFamily={note.font} fill="#212529" textAnchor="start" dominantBaseline="central">{note.char}</text>
+                                                        <text x="0" y={stemDown ? -18 : 32} fontSize="9" fontFamily="monospace" fill="#e04e8a" textAnchor="middle" fontWeight="bold">{note.centsLabel}</text>
                                                     </g>
                                                 );
                                             })}
@@ -2795,13 +2868,14 @@ export default function HarmonicNetwork({ activeTool = 1, themeColor = "#e04e8a"
                                         const y = 60 + sIdx * 80;
                                         let scalePoints = [];
 
-                                        // O Mapeamento Absoluto dos Pontos (Calcula as escalas customizadas puxadas da Aba 11)
+                                        // O Mapeamento Absoluto dos Pontos (Cálculo Fiel a SCL e EDO)
                                         if (scale.type === 'edo') {
                                             for (let i = 0; i <= scale.value; i++) scalePoints.push(i * (1200 / scale.value));
                                         } else if (scale.type === 'custom' && scale.tuningObj) {
                                             if (scale.tuningObj.type === 'edo') {
                                                 for (let i = 0; i <= scale.tuningObj.divisions; i++) scalePoints.push(i * (1200 / scale.tuningObj.divisions));
                                             } else if (scale.tuningObj.type === 'scala' && scale.tuningObj.data) {
+                                                // Escalas Scala: Adicionamos o 0 (A tónica pura) e mapeamos o resto pelo valor 'cents' que o seu scalaParser.js gerou!
                                                 scalePoints = [0, ...scale.tuningObj.data.scale.map(s => s.cents)];
                                             }
                                         }
